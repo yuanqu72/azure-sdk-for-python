@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for
 # license information.
 # --------------------------------------------------------------------------
+import os
 from typing import List
 from testcase import AppConfigTestCase
 from azure.appconfiguration.aio import AzureAppConfigurationClient
@@ -14,6 +15,8 @@ from azure.core.async_paging import AsyncItemPaged
 class AsyncAppConfigTestCase(AppConfigTestCase):
     def create_client(self, appconfiguration_endpoint_string, audience=None):
         cred = self.get_credential(AzureAppConfigurationClient, is_async=True)
+        if audience is None:
+            audience = os.environ.get("APPCONFIGURATION_AUDIENCE")
         return AzureAppConfigurationClient(appconfiguration_endpoint_string, cred, audience=audience)
 
     async def convert_to_list(self, items: AsyncItemPaged) -> List:

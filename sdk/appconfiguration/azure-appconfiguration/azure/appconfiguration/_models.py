@@ -19,6 +19,15 @@ from ._generated.models import (
     Snapshot as GeneratedConfigurationSnapshot,
     SnapshotStatus,
     SnapshotComposition,
+    FeatureFlag as _GeneratedFeatureFlag,
+    FeatureFlagAllocation as _GeneratedFeatureFlagAllocation,
+    FeatureFlagConditions as _GeneratedFeatureFlagConditions,
+    FeatureFlagFilter as _GeneratedFeatureFlagFilter,
+    FeatureFlagTelemetryConfiguration as _GeneratedFeatureFlagTelemetryConfiguration,
+    FeatureFlagVariantDefinition as _GeneratedFeatureFlagVariantDefinition,
+    GroupAllocation as _GeneratedGroupAllocation,
+    PercentileAllocation as _GeneratedPercentileAllocation,
+    UserAllocation as _GeneratedUserAllocation,
 )
 from ._generated._utils.model_base import _deserialize
 
@@ -287,6 +296,54 @@ class FeatureFlagConfigurationSetting(ConfigurationSetting):  # pylint: disable=
             etag=self.etag,
         )
 
+    @classmethod
+    def _from_feature_flag(cls, feature_flag: _GeneratedFeatureFlag) -> "FeatureFlagConfigurationSetting":
+        """Create a FeatureFlagConfigurationSetting from a native FeatureFlag object.
+        
+        :param feature_flag: The native FeatureFlag object from the Feature Flag endpoint
+        :type feature_flag: ~azure.appconfiguration._generated.models.FeatureFlag
+        :return: A FeatureFlagConfigurationSetting
+        :rtype: ~azure.appconfiguration.FeatureFlagConfigurationSetting
+        """
+        filters = None
+        if feature_flag.conditions and feature_flag.conditions.get("client_filters"):
+            filters = feature_flag.conditions["client_filters"]
+        
+        return cls(
+            feature_id=feature_flag.name,  # type: ignore
+            key=cls._key_prefix + feature_flag.name,
+            label=feature_flag.label,
+            content_type=cls._feature_flag_content_type,
+            last_modified=feature_flag.last_modified,
+            tags=feature_flag.tags or {},
+            read_only=False,  # FeatureFlag doesn't have a read_only field
+            etag=feature_flag.etag,
+            enabled=feature_flag.enabled or False,
+            filters=filters,
+            display_name=None,
+            description=feature_flag.description,
+        )
+
+    def _to_feature_flag(self) -> _GeneratedFeatureFlag:
+        """Convert this FeatureFlagConfigurationSetting to a native FeatureFlag object.
+        
+        :return: A native FeatureFlag object for the Feature Flag endpoint
+        :rtype: ~azure.appconfiguration._generated.models.FeatureFlag
+        """
+        conditions = None
+        if self.filters:
+            conditions = {"client_filters": self.filters}
+        
+        return _GeneratedFeatureFlag(
+            name=self.feature_id,
+            enabled=self.enabled,
+            label=self.label,
+            description=self.description,
+            conditions=conditions,
+            tags=self.tags,
+            etag=self.etag,
+        )
+
 
 class SecretReferenceConfigurationSetting(ConfigurationSetting):
     """A configuration value that references a configuration setting secret."""
@@ -401,6 +458,548 @@ class SecretReferenceConfigurationSetting(ConfigurationSetting):
             locked=self.read_only,
             etag=self.etag,
             description=self.description,
+        )
+
+
+class FeatureFlagFilter:
+    """A filter that conditionally enables or disables a feature flag.
+
+    :ivar name: The name of the filter. Required.
+    :vartype name: str
+    :ivar parameters: The parameters used by the filter.
+    :vartype parameters: dict[str, Any] or None
+    """
+
+    name: str
+    """The name of the filter. Required."""
+    parameters: Optional[Dict[str, Any]]
+    """The parameters used by the filter."""
+
+    def __init__(self, *, name: str, parameters: Optional[Dict[str, Any]] = None) -> None:
+        """
+        :keyword name: The name of the filter. Required.
+        :paramtype name: str
+        :keyword parameters: The parameters used by the filter.
+        :paramtype parameters: dict[str, Any] or None
+        """
+        self.name = name
+        self.parameters = parameters
+
+    @classmethod
+    def _from_generated(cls, generated: _GeneratedFeatureFlagFilter) -> "FeatureFlagFilter":
+        return cls(name=generated.name, parameters=generated.parameters)
+
+    def _to_generated(self) -> _GeneratedFeatureFlagFilter:
+        return _GeneratedFeatureFlagFilter(name=self.name, parameters=self.parameters)
+
+
+class FeatureFlagConditions:
+    """The conditions that must be met for a feature flag to be enabled.
+
+    :ivar requirement_type: The requirement type for the conditions. Known values are: "Any" and
+     "All".
+    :vartype requirement_type: str or None
+    :ivar client_filters: The filters that will conditionally enable or disable the flag.
+    :vartype client_filters: list[~azure.appconfiguration.FeatureFlagFilter] or None
+    """
+
+    requirement_type: Optional[str]
+    """The requirement type for the conditions. Known values are: "Any" and "All"."""
+    client_filters: Optional[List[FeatureFlagFilter]]
+    """The filters that will conditionally enable or disable the flag."""
+
+    def __init__(
+        self,
+        *,
+        requirement_type: Optional[str] = None,
+        client_filters: Optional[List[FeatureFlagFilter]] = None,
+    ) -> None:
+        """
+        :keyword requirement_type: The requirement type for the conditions. Known values are: "Any"
+         and "All".
+        :paramtype requirement_type: str or None
+        :keyword client_filters: The filters that will conditionally enable or disable the flag.
+        :paramtype client_filters: list[~azure.appconfiguration.FeatureFlagFilter] or None
+        """
+        self.requirement_type = requirement_type
+        self.client_filters = client_filters
+
+    @classmethod
+    def _from_generated(cls, generated: _GeneratedFeatureFlagConditions) -> "FeatureFlagConditions":
+        return cls(
+            requirement_type=generated.requirement_type,
+            client_filters=(
+                [FeatureFlagFilter._from_generated(f) for f in generated.filters]
+                if generated.filters is not None
+                else None
+            ),
+        )
+
+    def _to_generated(self) -> _GeneratedFeatureFlagConditions:
+        return _GeneratedFeatureFlagConditions(
+            requirement_type=self.requirement_type,
+            filters=(
+                [f._to_generated() for f in self.client_filters] if self.client_filters is not None else None
+            ),
+        )
+
+
+class FeatureFlagVariantDefinition:
+    """A variant of a feature flag.
+
+    :ivar name: The name of the variant. Required.
+    :vartype name: str
+    :ivar value: The value of the variant.
+    :vartype value: str or None
+    :ivar content_type: The content type of the value stored within the key-value.
+    :vartype content_type: str or None
+    :ivar status_override: Determines if the variant should override the status of the flag. Known
+     values are: "None", "Enabled", and "Disabled".
+    :vartype status_override: str or None
+    """
+
+    name: str
+    """The name of the variant. Required."""
+    value: Optional[str]
+    """The value of the variant."""
+    content_type: Optional[str]
+    """The content type of the value stored within the key-value."""
+    status_override: Optional[str]
+    """Determines if the variant should override the status of the flag."""
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        value: Optional[str] = None,
+        content_type: Optional[str] = None,
+        status_override: Optional[str] = None,
+    ) -> None:
+        """
+        :keyword name: The name of the variant. Required.
+        :paramtype name: str
+        :keyword value: The value of the variant.
+        :paramtype value: str or None
+        :keyword content_type: The content type of the value stored within the key-value.
+        :paramtype content_type: str or None
+        :keyword status_override: Determines if the variant should override the status of the flag.
+         Known values are: "None", "Enabled", and "Disabled".
+        :paramtype status_override: str or None
+        """
+        self.name = name
+        self.value = value
+        self.content_type = content_type
+        self.status_override = status_override
+
+    @classmethod
+    def _from_generated(
+        cls, generated: _GeneratedFeatureFlagVariantDefinition
+    ) -> "FeatureFlagVariantDefinition":
+        return cls(
+            name=generated.name,
+            value=generated.value,
+            content_type=generated.content_type,
+            status_override=generated.status_override,
+        )
+
+    def _to_generated(self) -> _GeneratedFeatureFlagVariantDefinition:
+        return _GeneratedFeatureFlagVariantDefinition(
+            name=self.name,
+            value=self.value,
+            content_type=self.content_type,
+            status_override=self.status_override,
+        )
+
+
+class PercentileAllocation:
+    """Allocates a percentile range of users to a variant.
+
+    :ivar variant: The variant to allocate these percentiles to. Required.
+    :vartype variant: str
+    :ivar percentile_from: The lower bounds for this percentile allocation. Required.
+    :vartype percentile_from: int
+    :ivar percentile_to: The upper bounds for this percentile allocation. Required.
+    :vartype percentile_to: int
+    """
+
+    variant: str
+    """The variant to allocate these percentiles to. Required."""
+    percentile_from: int
+    """The lower bounds for this percentile allocation. Required."""
+    percentile_to: int
+    """The upper bounds for this percentile allocation. Required."""
+
+    def __init__(self, *, variant: str, percentile_from: int, percentile_to: int) -> None:
+        """
+        :keyword variant: The variant to allocate these percentiles to. Required.
+        :paramtype variant: str
+        :keyword percentile_from: The lower bounds for this percentile allocation. Required.
+        :paramtype percentile_from: int
+        :keyword percentile_to: The upper bounds for this percentile allocation. Required.
+        :paramtype percentile_to: int
+        """
+        self.variant = variant
+        self.percentile_from = percentile_from
+        self.percentile_to = percentile_to
+
+    @classmethod
+    def _from_generated(cls, generated: _GeneratedPercentileAllocation) -> "PercentileAllocation":
+        return cls(
+            variant=generated.variant,
+            percentile_from=generated.from_property,
+            percentile_to=generated.to,
+        )
+
+    def _to_generated(self) -> _GeneratedPercentileAllocation:
+        return _GeneratedPercentileAllocation(
+            variant=self.variant,
+            from_property=self.percentile_from,
+            to=self.percentile_to,
+        )
+
+
+class UserAllocation:
+    """Allocates specific users to a variant.
+
+    :ivar variant: The variant to allocate these users to. Required.
+    :vartype variant: str
+    :ivar users: The users to get this variant. Required.
+    :vartype users: list[str]
+    """
+
+    variant: str
+    """The variant to allocate these users to. Required."""
+    users: List[str]
+    """The users to get this variant. Required."""
+
+    def __init__(self, *, variant: str, users: List[str]) -> None:
+        """
+        :keyword variant: The variant to allocate these users to. Required.
+        :paramtype variant: str
+        :keyword users: The users to get this variant. Required.
+        :paramtype users: list[str]
+        """
+        self.variant = variant
+        self.users = users
+
+    @classmethod
+    def _from_generated(cls, generated: _GeneratedUserAllocation) -> "UserAllocation":
+        return cls(variant=generated.variant, users=generated.users)
+
+    def _to_generated(self) -> _GeneratedUserAllocation:
+        return _GeneratedUserAllocation(variant=self.variant, users=self.users)
+
+
+class GroupAllocation:
+    """Allocates specific groups to a variant.
+
+    :ivar variant: The variant to allocate these groups to. Required.
+    :vartype variant: str
+    :ivar groups: The groups to get this variant. Required.
+    :vartype groups: list[str]
+    """
+
+    variant: str
+    """The variant to allocate these groups to. Required."""
+    groups: List[str]
+    """The groups to get this variant. Required."""
+
+    def __init__(self, *, variant: str, groups: List[str]) -> None:
+        """
+        :keyword variant: The variant to allocate these groups to. Required.
+        :paramtype variant: str
+        :keyword groups: The groups to get this variant. Required.
+        :paramtype groups: list[str]
+        """
+        self.variant = variant
+        self.groups = groups
+
+    @classmethod
+    def _from_generated(cls, generated: _GeneratedGroupAllocation) -> "GroupAllocation":
+        return cls(variant=generated.variant, groups=generated.groups)
+
+    def _to_generated(self) -> _GeneratedGroupAllocation:
+        return _GeneratedGroupAllocation(variant=self.variant, groups=self.groups)
+
+
+class FeatureFlagAllocation:
+    """Defines how to allocate variants based on context.
+
+    :ivar default_when_disabled: The default variant to use when disabled.
+    :vartype default_when_disabled: str or None
+    :ivar default_when_enabled: The default variant to use when enabled but not allocated.
+    :vartype default_when_enabled: str or None
+    :ivar percentile: Allocates percentiles to variants.
+    :vartype percentile: list[~azure.appconfiguration.PercentileAllocation] or None
+    :ivar user: Allocates users to variants.
+    :vartype user: list[~azure.appconfiguration.UserAllocation] or None
+    :ivar group: Allocates groups to variants.
+    :vartype group: list[~azure.appconfiguration.GroupAllocation] or None
+    :ivar seed: The seed used for random allocation.
+    :vartype seed: str or None
+    """
+
+    default_when_disabled: Optional[str]
+    """The default variant to use when disabled."""
+    default_when_enabled: Optional[str]
+    """The default variant to use when enabled but not allocated."""
+    percentile: Optional[List[PercentileAllocation]]
+    """Allocates percentiles to variants."""
+    user: Optional[List[UserAllocation]]
+    """Allocates users to variants."""
+    group: Optional[List[GroupAllocation]]
+    """Allocates groups to variants."""
+    seed: Optional[str]
+    """The seed used for random allocation."""
+
+    def __init__(
+        self,
+        *,
+        default_when_disabled: Optional[str] = None,
+        default_when_enabled: Optional[str] = None,
+        percentile: Optional[List[PercentileAllocation]] = None,
+        user: Optional[List[UserAllocation]] = None,
+        group: Optional[List[GroupAllocation]] = None,
+        seed: Optional[str] = None,
+    ) -> None:
+        """
+        :keyword default_when_disabled: The default variant to use when disabled.
+        :paramtype default_when_disabled: str or None
+        :keyword default_when_enabled: The default variant to use when enabled but not allocated.
+        :paramtype default_when_enabled: str or None
+        :keyword percentile: Allocates percentiles to variants.
+        :paramtype percentile: list[~azure.appconfiguration.PercentileAllocation] or None
+        :keyword user: Allocates users to variants.
+        :paramtype user: list[~azure.appconfiguration.UserAllocation] or None
+        :keyword group: Allocates groups to variants.
+        :paramtype group: list[~azure.appconfiguration.GroupAllocation] or None
+        :keyword seed: The seed used for random allocation.
+        :paramtype seed: str or None
+        """
+        self.default_when_disabled = default_when_disabled
+        self.default_when_enabled = default_when_enabled
+        self.percentile = percentile
+        self.user = user
+        self.group = group
+        self.seed = seed
+
+    @classmethod
+    def _from_generated(cls, generated: _GeneratedFeatureFlagAllocation) -> "FeatureFlagAllocation":
+        return cls(
+            default_when_disabled=generated.default_when_disabled,
+            default_when_enabled=generated.default_when_enabled,
+            percentile=(
+                [PercentileAllocation._from_generated(p) for p in generated.percentile]
+                if generated.percentile is not None
+                else None
+            ),
+            user=(
+                [UserAllocation._from_generated(u) for u in generated.user]
+                if generated.user is not None
+                else None
+            ),
+            group=(
+                [GroupAllocation._from_generated(g) for g in generated.group]
+                if generated.group is not None
+                else None
+            ),
+            seed=generated.seed,
+        )
+
+    def _to_generated(self) -> _GeneratedFeatureFlagAllocation:
+        return _GeneratedFeatureFlagAllocation(
+            default_when_disabled=self.default_when_disabled,
+            default_when_enabled=self.default_when_enabled,
+            percentile=(
+                [p._to_generated() for p in self.percentile] if self.percentile is not None else None
+            ),
+            user=[u._to_generated() for u in self.user] if self.user is not None else None,
+            group=[g._to_generated() for g in self.group] if self.group is not None else None,
+            seed=self.seed,
+        )
+
+
+class FeatureFlagTelemetryConfiguration:
+    """The telemetry configuration of a feature flag.
+
+    :ivar enabled: The enabled state of the telemetry. Required.
+    :vartype enabled: bool
+    :ivar metadata: The metadata to include on outbound telemetry.
+    :vartype metadata: dict[str, str] or None
+    """
+
+    enabled: bool
+    """The enabled state of the telemetry. Required."""
+    metadata: Optional[Dict[str, str]]
+    """The metadata to include on outbound telemetry."""
+
+    def __init__(self, *, enabled: bool, metadata: Optional[Dict[str, str]] = None) -> None:
+        """
+        :keyword enabled: The enabled state of the telemetry. Required.
+        :paramtype enabled: bool
+        :keyword metadata: The metadata to include on outbound telemetry.
+        :paramtype metadata: dict[str, str] or None
+        """
+        self.enabled = enabled
+        self.metadata = metadata
+
+    @classmethod
+    def _from_generated(
+        cls, generated: _GeneratedFeatureFlagTelemetryConfiguration
+    ) -> "FeatureFlagTelemetryConfiguration":
+        return cls(enabled=generated.enabled, metadata=generated.metadata)
+
+    def _to_generated(self) -> _GeneratedFeatureFlagTelemetryConfiguration:
+        return _GeneratedFeatureFlagTelemetryConfiguration(enabled=self.enabled, metadata=self.metadata)
+
+
+class FeatureFlag(Model):
+    """A feature flag used with the dedicated feature flag endpoints.
+    
+    This model represents a feature flag and is used exclusively with the
+    feature flag-specific API endpoints (set_feature_flag, get_feature_flag, etc).
+    """
+
+    name: str
+    """The name of the feature flag."""
+    enabled: Optional[bool]
+    """The enabled state of the feature flag."""
+    label: Optional[str]
+    """The label the feature flag belongs to."""
+    description: Optional[str]
+    """The description of the feature flag."""
+    conditions: Optional[FeatureFlagConditions]
+    """The conditions of the feature flag."""
+    variants: Optional[List[FeatureFlagVariantDefinition]]
+    """The variants of the feature flag."""
+    allocation: Optional[FeatureFlagAllocation]
+    """The allocation of the feature flag."""
+    telemetry: Optional[FeatureFlagTelemetryConfiguration]
+    """The telemetry settings of the feature flag."""
+    tags: Optional[Dict[str, str]]
+    """The tags of the feature flag."""
+    last_modified: Optional[datetime]
+    """A date representing the last time the feature flag was modified."""
+    etag: Optional[str]
+    """A value representing the current state of the resource."""
+
+    _attribute_map = {
+        "name": {"key": "name", "type": "str"},
+        "enabled": {"key": "enabled", "type": "bool"},
+        "label": {"key": "label", "type": "str"},
+        "description": {"key": "description", "type": "str"},
+        "conditions": {"key": "conditions", "type": "object"},
+        "variants": {"key": "variants", "type": "[object]"},
+        "allocation": {"key": "allocation", "type": "object"},
+        "telemetry": {"key": "telemetry", "type": "object"},
+        "tags": {"key": "tags", "type": "{str}"},
+        "last_modified": {"key": "last_modified", "type": "iso-8601"},
+        "etag": {"key": "etag", "type": "str"},
+    }
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        enabled: Optional[bool] = None,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        conditions: Optional[FeatureFlagConditions] = None,
+        variants: Optional[List[FeatureFlagVariantDefinition]] = None,
+        allocation: Optional[FeatureFlagAllocation] = None,
+        telemetry: Optional[FeatureFlagTelemetryConfiguration] = None,
+        tags: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        :param name: The name of the feature flag.
+        :type name: str
+        :keyword enabled: The enabled state of the feature flag. Default is False.
+        :paramtype enabled: bool or None
+        :keyword label: The label the feature flag belongs to.
+        :paramtype label: str or None
+        :keyword description: The description of the feature flag.
+        :paramtype description: str or None
+        :keyword conditions: The conditions of the feature flag.
+        :paramtype conditions: ~azure.appconfiguration.FeatureFlagConditions or None
+        :keyword variants: The variants of the feature flag.
+        :paramtype variants: list[~azure.appconfiguration.FeatureFlagVariantDefinition] or None
+        :keyword allocation: The allocation of the feature flag.
+        :paramtype allocation: ~azure.appconfiguration.FeatureFlagAllocation or None
+        :keyword telemetry: The telemetry settings of the feature flag.
+        :paramtype telemetry: ~azure.appconfiguration.FeatureFlagTelemetryConfiguration or None
+        :keyword tags: The tags of the feature flag.
+        :paramtype tags: dict[str, str] or None
+        """
+        self.name = name
+        self.enabled = enabled if enabled is not None else False
+        self.label = label
+        self.description = description
+        self.conditions = conditions
+        self.variants = variants
+        self.allocation = allocation
+        self.telemetry = telemetry
+        self.tags = tags or {}
+        self.last_modified = kwargs.get("last_modified", None)
+        self.etag = kwargs.get("etag", None)
+
+    @classmethod
+    def _from_generated(cls, generated: _GeneratedFeatureFlag) -> "FeatureFlag":
+        """Create an SDK FeatureFlag from a generated FeatureFlag object.
+        
+        :param generated: The generated FeatureFlag object
+        :type generated: ~azure.appconfiguration._generated.models.FeatureFlag
+        :return: An SDK FeatureFlag
+        :rtype: ~azure.appconfiguration.FeatureFlag
+        """
+        return cls(
+            name=generated.name,
+            enabled=generated.enabled,
+            label=generated.label,
+            description=generated.description,
+            conditions=(
+                FeatureFlagConditions._from_generated(generated.conditions)
+                if generated.conditions is not None
+                else None
+            ),
+            variants=(
+                [FeatureFlagVariantDefinition._from_generated(v) for v in generated.variants]
+                if generated.variants is not None
+                else None
+            ),
+            allocation=(
+                FeatureFlagAllocation._from_generated(generated.allocation)
+                if generated.allocation is not None
+                else None
+            ),
+            telemetry=(
+                FeatureFlagTelemetryConfiguration._from_generated(generated.telemetry)
+                if generated.telemetry is not None
+                else None
+            ),
+            tags=generated.tags,
+            last_modified=generated.last_modified,
+            etag=generated.etag,
+        )
+
+    def _to_generated(self) -> _GeneratedFeatureFlag:
+        """Convert this SDK FeatureFlag to a generated FeatureFlag object.
+        
+        :return: A generated FeatureFlag
+        :rtype: ~azure.appconfiguration._generated.models.FeatureFlag
+        """
+        return _GeneratedFeatureFlag(
+            name=self.name,
+            enabled=self.enabled,
+            label=self.label,
+            description=self.description,
+            conditions=self.conditions._to_generated() if self.conditions is not None else None,
+            variants=(
+                [v._to_generated() for v in self.variants] if self.variants is not None else None
+            ),
+            allocation=self.allocation._to_generated() if self.allocation is not None else None,
+            telemetry=self.telemetry._to_generated() if self.telemetry is not None else None,
+            tags=self.tags,
         )
 
 
@@ -599,6 +1198,178 @@ class ConfigurationSettingLabel:
 
 def _return_deserialized_and_headers(_, deserialized, response_headers):
     return deserialized, response_headers
+
+
+class FeatureFlagConfigurationSettingPropertiesPagedBase:  # pylint:disable=too-many-instance-attributes
+    """Base class for iterable of FeatureFlagConfigurationSetting properties."""
+
+    etag: str
+    """The current etag"""
+    _etags: List[str]
+    """The etag expected for the pages."""
+    _command: Callable
+    """The command to get the next page"""
+    _key: Optional[str]
+    """The key filter for the items"""
+    _label: Optional[str]
+    """The label filter for the items"""
+    _accept_datetime: Optional[str]
+    """The accept datetime for the items"""
+    _select: Optional[List[Union[str, Any]]]
+    """The select fields for the items"""
+    _tags: Optional[List[str]]
+    """The tags filter for the items"""
+    _snapshot: Optional[str]
+    """The snapshot name for the items"""
+    _match_condition: Optional[MatchConditions]
+    """The match condition"""
+    _kwargs: Dict[str, Any]
+    """The keyword arguments"""
+
+    def __init__(self, command: Callable, **kwargs: Any):
+        self._command = command
+        self._key = kwargs.pop("key", None)
+        self._label = kwargs.pop("label", None)
+        self._accept_datetime = kwargs.pop("accept_datetime", None)
+        self._select = kwargs.pop("select", None)
+        self._tags = kwargs.pop("tags", None)
+        self._snapshot = kwargs.pop("snapshot", None)
+        self._match_condition = kwargs.pop("match_condition", None)
+        self._kwargs = kwargs
+        self._etags: List[str] = []
+
+    def _next_etag(self) -> Optional[str]:
+        if self._etags:
+            etag = self._etags.pop(0)
+            return etag
+        return None
+
+    def _extract_data_cb_base(self, get_next_return):
+        etags, data = get_next_return
+        self.etag = etags
+        return data
+
+    def _page_iterator_class(self, **kwargs: Any) -> PageIterator:
+        raise NotImplementedError()
+
+
+class FeatureFlagConfigurationSettingPropertiesPaged(
+    FeatureFlagConfigurationSettingPropertiesPagedBase, PageIterator
+):  # pylint:disable=too-many-instance-attributes
+    """An iterable of FeatureFlagConfigurationSetting properties."""
+
+    def __init__(self, command: Callable, **kwargs: Any):
+        super().__init__(command, **kwargs)
+        PageIterator.__init__(
+            self,
+            self._get_next_cb,
+            self._extract_data_cb,
+            continuation_token=kwargs.get("continuation_token"),
+        )
+
+    def _get_next_cb(self, continuation_token, **kwargs):
+        etag = self._next_etag()
+        return self._command(
+            name=self._key,
+            label=self._label,
+            accept_datetime=self._accept_datetime,
+            select=self._select,
+            tags=self._tags,
+            etag=etag,
+            match_condition=self._match_condition,
+            continuation_token=continuation_token,
+            cls=kwargs.pop("cls", None) or _return_deserialized_and_headers,
+        )
+
+    def _extract_data_cb(self, get_next_return):
+        return self._extract_data_cb_base(get_next_return)
+
+    def __next__(self) -> Iterator[ReturnType]:
+        """Get the next page in the iterator.
+
+        :returns: An iterator of objects in the next page.
+        :rtype: iterator[ReturnType]
+        :raises StopIteration: If there are no more pages to return.
+        :raises AzureError: If the request fails.
+        """
+        # Is the exact same method as `PageIterator`, excluding the if statement before the return.
+        if self.continuation_token is None and self._did_a_call_already:
+            raise StopIteration("End of paging")
+        try:
+            self._response = self._get_next(self.continuation_token)
+        except AzureError as error:
+            if not error.continuation_token:
+                error.continuation_token = self.continuation_token
+            raise
+
+        self._did_a_call_already = True
+
+        self.continuation_token, self._current_page = self._extract_data(self._response)
+
+        # App Config's addition to skip empty pages
+        if self._current_page is None:
+            # We skip over pages that are empty, change from mach conditions
+            return self.__next__()
+        return iter(self._current_page)
+
+
+class FeatureFlagConfigurationSettingPropertiesPagedAsync(
+    FeatureFlagConfigurationSettingPropertiesPagedBase, AsyncPageIterator
+):  # pylint:disable=too-many-instance-attributes
+    """An async iterable of FeatureFlagConfigurationSetting properties."""
+
+    def __init__(self, command: Callable, **kwargs: Any):
+        super().__init__(command, **kwargs)
+        AsyncPageIterator.__init__(
+            self,
+            self._get_next_cb,
+            self._extract_data_cb,
+            continuation_token=kwargs.get("continuation_token"),
+        )
+
+    def _get_next_cb(self, continuation_token, **kwargs):
+        etag = self._next_etag()
+        return self._command(
+            name=self._key,
+            label=self._label,
+            accept_datetime=self._accept_datetime,
+            select=self._select,
+            tags=self._tags,
+            etag=etag,
+            match_condition=self._match_condition,
+            continuation_token=continuation_token,
+            cls=kwargs.pop("cls", None) or _return_deserialized_and_headers,
+        )
+
+    def _extract_data_cb(self, get_next_return):
+        return self._extract_data_cb_base(get_next_return)
+
+    async def __anext__(self):
+        """Get the next page in the async iterator.
+
+        :returns: An async iterator of objects in the next page.
+        :rtype: async_iterator[ReturnType]
+        :raises StopAsyncIteration: If there are no more pages to return.
+        :raises AzureError: If the request fails.
+        """
+        if self.continuation_token is None and self._did_a_call_already:
+            raise StopAsyncIteration("End of paging")  # pylint: disable=raise-missing-from
+        try:
+            self._response = await self._get_next(self.continuation_token)
+        except AzureError as error:
+            if not error.continuation_token:
+                error.continuation_token = self.continuation_token
+            raise
+
+        self._did_a_call_already = True
+
+        self.continuation_token, self._current_page = self._extract_data(self._response)
+
+        # App Config's addition to skip empty pages
+        if self._current_page is None:
+            # We skip over pages that are empty, change from mach conditions
+            return await self.__anext__()
+        return self._current_page
 
 
 class ConfigurationSettingPropertiesPagedBase:  # pylint:disable=too-many-instance-attributes
@@ -865,6 +1636,61 @@ class AsyncConfigurationSettingPaged(AsyncItemPaged[ConfigurationSetting]):
     If the page has not changed (HTTP 304), it is skipped. If the page has changed (HTTP 200),
     the new page is returned. This allows efficient polling for changes without retrieving
     unchanged data.
+    """
+
+    def by_page(self, continuation_token: Optional[str] = None, *, match_conditions: Optional[List[str]] = None) -> Any:
+        """Get an async iterator of pages of objects, instead of an iterator of objects.
+
+        :param str continuation_token:
+            An opaque continuation token. This value can be retrieved from the
+            continuation_token field of a previous generator object. If specified,
+            this generator will begin returning results from this point.
+        :keyword match_conditions: A list of etags to check for changes. If provided, the iterator will
+            check each page against the corresponding etag and only return pages that have changed.
+        :paramtype match_conditions: list[str] or None
+        :returns: An async iterator of pages (themselves iterator of objects)
+        :rtype: AsyncIterator[AsyncIterator[ReturnType]]
+        """
+        if "match_conditions" not in self._kwargs and match_conditions:
+            self._kwargs["etags"] = match_conditions
+            self._kwargs["match_condition"] = MatchConditions.IfModified
+        return self._page_iterator_class(continuation_token=continuation_token, *self._args, **self._kwargs)
+
+
+class FeatureFlagConfigurationSettingPaged(ItemPaged["FeatureFlagConfigurationSetting"]):
+    """
+    An iterable of FeatureFlagConfigurationSettings that supports etag-based change detection.
+
+    This class extends ItemPaged to provide efficient monitoring of feature flag configuration changes
+    by using ETags. When used with the `match_conditions` parameter in `by_page()`,
+    it only returns pages that have changed since the provided ETags were collected.
+    """
+
+    def by_page(self, continuation_token: Optional[str] = None, *, match_conditions: Optional[List[str]] = None) -> Any:
+        """Get an iterator of pages of objects, instead of an iterator of objects.
+
+        :param str continuation_token:
+            An opaque continuation token. This value can be retrieved from the
+            continuation_token field of a previous generator object. If specified,
+            this generator will begin returning results from this point.
+        :keyword match_conditions: A list of etags to check for changes. If provided, the iterator will
+            check each page against the corresponding etag and only return pages that have changed.
+        :paramtype match_conditions: list[str] or None
+        :returns: An iterator of pages (themselves iterator of objects)
+        :rtype: iterator[iterator[ReturnType]]
+        """
+        if "match_conditions" not in self._kwargs and match_conditions:
+            self._kwargs["etags"] = match_conditions
+            self._kwargs["match_condition"] = MatchConditions.IfModified
+        return self._page_iterator_class(continuation_token=continuation_token, *self._args, **self._kwargs)
+
+
+class AsyncFeatureFlagConfigurationSettingPaged(AsyncItemPaged["FeatureFlagConfigurationSetting"]):
+    """
+    An async iterable of FeatureFlagConfigurationSettings that supports etag-based change detection.
+
+    This class provides asynchronous iteration over feature flag configuration settings, with optional support for
+    etag-based change detection.
     """
 
     def by_page(self, continuation_token: Optional[str] = None, *, match_conditions: Optional[List[str]] = None) -> Any:

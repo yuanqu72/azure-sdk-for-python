@@ -1,3 +1,4 @@
+# pylint: disable=line-too-long,useless-suppression
 # ------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for
@@ -14,7 +15,7 @@ from azure.core.pipeline.policies import AsyncBearerTokenCredentialPolicy
 from azure.core.polling import AsyncLROPoller
 from azure.core.tracing.decorator import distributed_trace
 from azure.core.tracing.decorator_async import distributed_trace_async
-from azure.core.exceptions import ResourceNotModifiedError
+from azure.core.exceptions import ResourceNotFoundError, ResourceNotModifiedError
 from azure.core.rest import AsyncHttpResponse, HttpRequest
 from ._sync_token_async import AsyncSyncTokenPolicy
 from .._azure_appconfiguration_error import ResourceReadOnlyError
@@ -36,6 +37,7 @@ from .._models import (
     ConfigurationSettingsFilter,
     ConfigurationSnapshot,
     ConfigurationSettingLabel,
+    FeatureFlag,
 )
 from .._audience import get_audience, DEFAULT_SCOPE_SUFFIX
 from .._utils import (
@@ -843,6 +845,211 @@ class AzureAppConfigurationClient:
             status=status,
             cls=lambda objs: [ConfigurationSnapshot._from_generated(x) for x in objs],
             **kwargs,
+        )
+
+    @distributed_trace
+    def list_feature_flags(
+        self,
+        name_filter: Optional[str] = None,
+        label_filter: Optional[str] = None,
+        *,
+        tags_filter: Optional[List[str]] = None,
+        accept_datetime: Optional[Union[datetime, str]] = None,
+        **kwargs: Any,
+    ) -> AsyncConfigurationSettingPaged:
+        """
+        Find the FeatureFlag objects, optionally filtered by name, label, tags and accept_datetime.
+
+        :param name_filter: Filter results based on their feature flag names. '*' can be used as wildcard at the end
+            of the filter. Default is `None`.
+        :type name_filter: str or None
+        :param label_filter: Filter results based on their labels. Default is `None`.
+        :type label_filter: str or None
+        :keyword tags_filter: Filter results based on their tags. Default is `None`.
+        :paramtype tags_filter: list[str] or None
+        :keyword accept_datetime: Retrieve FeatureFlag that existed at this datetime
+        :paramtype accept_datetime: ~datetime.datetime or str or None
+        :return: An async iterator of :class:`~azure.appconfiguration.FeatureFlag`
+        :rtype: ~azure.core.paging.AsyncItemPaged[~azure.appconfiguration.FeatureFlag]
+        :raises: :class:`~azure.core.exceptions.HttpResponseError`
+        """
+        if isinstance(accept_datetime, datetime):
+            accept_datetime = str(accept_datetime)
+
+        # Call the generated method and wrap results to convert to SDK FeatureFlag
+        def convert_to_sdk(objs):
+            return [FeatureFlag._from_generated(obj) for obj in objs]
+
+        return self._impl.get_feature_flags(  # type: ignore[return-value]
+            name=name_filter,
+            label=label_filter,
+            accept_datetime=accept_datetime,
+            tags=tags_filter,
+            cls=convert_to_sdk,
+            **kwargs
+        )
+
+    @distributed_trace_async
+    async def get_feature_flag(
+        self,
+        feature_id: str,
+        label: Optional[str] = None,
+        *,
+        etag: Optional[str] = None,
+        match_condition: MatchConditions = MatchConditions.Unconditionally,
+        accept_datetime: Optional[Union[datetime, str]] = None,
+        **kwargs: Any,
+    ) -> Optional["FeatureFlag"]:
+        """
+        Get a feature flag from the service, identified by `feature_id` and optionally `label`.
+
+        :param feature_id: The feature flag identifier.
+        :type feature_id: str
+        :param label: The label of the feature flag. Defaults to None.
+        :type label: str or None
+        :keyword etag: Check if the feature flag is changed. Set None to skip checking etag.
+        :paramtype etag: str or None
+        :keyword match_condition: The match condition to use upon the etag.
+        :paramtype match_condition: ~azure.core.MatchConditions
+        :keyword accept_datetime: Retrieve the FeatureFlag that existed at this datetime.
+        :paramtype accept_datetime: ~datetime.datetime or str or None
+        :return: The FeatureFlag if found; None otherwise.
+        :rtype: ~azure.appconfiguration.FeatureFlag or None
+        :raises: :class:`~azure.core.exceptions.HttpResponseError`
+        """
+        if isinstance(accept_datetime, datetime):
+            accept_datetime = str(accept_datetime)
+
+        try:
+            generated_feature_flag = await self._impl.get_feature_flag(
+                name=feature_id,
+                label=label,
+                etag=etag,
+                match_condition=match_condition,
+                accept_datetime=accept_datetime,
+                **kwargs,
+            )
+            return FeatureFlag._from_generated(generated_feature_flag)
+        except (ResourceNotFoundError, ResourceNotModifiedError):
+            return None
+
+    @distributed_trace_async
+    async def set_feature_flag(
+        self,
+        feature_flag: "FeatureFlag",
+        match_condition: MatchConditions = MatchConditions.Unconditionally,
+        etag: Optional[str] = None,
+        **kwargs: Any,
+    ) -> "FeatureFlag":
+        """
+        Create or update a feature flag via the dedicated feature flag endpoint.
+
+        :param feature_flag: A FeatureFlag object.
+        :type feature_flag: ~azure.appconfiguration.FeatureFlag
+        :keyword match_condition: The match condition to use upon the etag.
+        :paramtype match_condition: ~azure.core.MatchConditions
+        :keyword etag: The etag of the feature flag. If provided, the feature flag will be updated only if the etag matches.
+        :paramtype etag: str or None
+        :return: The updated FeatureFlag.
+        :rtype: ~azure.appconfiguration.FeatureFlag
+        :raises: :class:`~azure.core.exceptions.HttpResponseError`
+        """
+        error_map: Dict[int, Any] = {409: ResourceReadOnlyError}
+
+        if etag is None:
+            etag = feature_flag.etag
+
+        generated_feature_flag = feature_flag._to_generated()
+        result = await self._impl.put_feature_flag(
+            name=feature_flag.name,
+            entity=generated_feature_flag,
+            label=feature_flag.label,
+            etag=etag,
+            match_condition=match_condition,
+            error_map=error_map,
+            **kwargs,
+        )
+
+        return FeatureFlag._from_generated(result)
+
+    @distributed_trace_async
+    async def delete_feature_flag(
+        self,
+        feature_id: str,
+        label: Optional[str] = None,
+        *,
+        etag: Optional[str] = None,
+        match_condition: MatchConditions = MatchConditions.Unconditionally,
+        **kwargs: Any,
+    ) -> Optional["FeatureFlag"]:
+        """
+        Delete a feature flag from the service.
+
+        :param feature_id: The feature flag identifier.
+        :type feature_id: str
+        :param label: The label of the feature flag. Defaults to None.
+        :type label: str or None
+        :keyword etag: Check if the feature flag is changed. Set None to skip checking etag.
+        :paramtype etag: str or None
+        :keyword match_condition: The match condition to use upon the etag.
+        :paramtype match_condition: ~azure.core.MatchConditions
+        :return: The deleted FeatureFlag, or None if not found.
+        :rtype: ~azure.appconfiguration.FeatureFlag or None
+        :raises: :class:`~azure.core.exceptions.HttpResponseError`
+        """
+        error_map: Dict[int, Any] = {409: ResourceReadOnlyError}
+        generated_feature_flag = await self._impl.delete_feature_flag(
+            name=feature_id,
+            label=label,
+            etag=etag,
+            match_condition=match_condition,
+            error_map=error_map,
+            **kwargs,
+        )
+        if generated_feature_flag:
+            return FeatureFlag._from_generated(generated_feature_flag)
+        return None
+
+    @distributed_trace
+    def list_feature_flag_revisions(
+        self,
+        feature_id_filter: Optional[str] = None,
+        label_filter: Optional[str] = None,
+        *,
+        accept_datetime: Optional[Union[datetime, str]] = None,
+        **kwargs: Any,
+    ) -> AsyncConfigurationSettingPaged:
+        """
+        Find the FeatureFlag revision history, optionally filtered by feature_id and label.
+
+        :param feature_id_filter: Filter results based on their feature flag names. '*' can be used as wildcard at the end
+            of the filter. Default is `None`.
+        :type feature_id_filter: str or None
+        :param label_filter: Filter results based on their labels. Default is `None`.
+        :type label_filter: str or None
+        :keyword accept_datetime: Retrieve FeatureFlag revisions that existed at this datetime
+        :paramtype accept_datetime: ~datetime.datetime or str or None
+        :return: An async iterator of :class:`~azure.appconfiguration.FeatureFlag`
+        :rtype: ~azure.core.paging.AsyncItemPaged[~azure.appconfiguration.FeatureFlag]
+        :raises: :class:`~azure.core.exceptions.HttpResponseError`
+        """
+        if isinstance(accept_datetime, datetime):
+            accept_datetime = str(accept_datetime)
+
+        # Build kwargs for the underlying call
+        impl_kwargs = dict(kwargs)
+        if accept_datetime is not None:
+            impl_kwargs["accept_datetime"] = accept_datetime
+
+        # Call the generated method and wrap results to convert to SDK FeatureFlag
+        def convert_to_sdk(objs):
+            return [FeatureFlag._from_generated(obj) for obj in objs]
+
+        return self._impl.get_feature_flag_revisions(  # type: ignore[return-value]
+            name=feature_id_filter,
+            label=label_filter,
+            cls=convert_to_sdk,
+            **impl_kwargs
         )
 
     async def update_sync_token(self, token: str) -> None:

@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for
 # license information.
 # --------------------------------------------------------------------------
+import os
 from consts import (
     KEY,
     LABEL,
@@ -25,6 +26,8 @@ class AppConfigTestCase(AzureRecordedTestCase):
 
     def create_client(self, appconfiguration_endpoint_string, audience=None):
         cred = self.get_credential(AzureAppConfigurationClient)
+        if audience is None:
+            audience = os.environ.get("APPCONFIGURATION_AUDIENCE")
         return AzureAppConfigurationClient(appconfiguration_endpoint_string, cred, audience=audience)
 
     def create_config_setting(self):
