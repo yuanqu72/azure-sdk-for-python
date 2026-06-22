@@ -83,7 +83,8 @@ class AzureAppConfigurationClient:
             audience = get_audience(base_url)
 
         # Ensure all scopes end with /.default and strip any trailing slashes before adding suffix
-        kwargs["credential_scopes"] = [audience + DEFAULT_SCOPE_SUFFIX]
+        audience_scope = audience.rstrip('/') + '/' + DEFAULT_SCOPE_SUFFIX
+        kwargs["credential_scopes"] = [audience_scope]
 
         if isinstance(credential, AzureKeyCredential):
             id_credential = kwargs.pop("id_credential")
