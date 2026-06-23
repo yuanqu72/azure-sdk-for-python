@@ -20,13 +20,17 @@ from azure.appconfiguration import (
     ConfigurationSnapshot,
 )
 
+# Sentinel distinguishing "argument omitted" (apply env-var fallback) from an
+# explicit ``audience=None`` (force no audience).
+_AUDIENCE_UNSET = object()
+
 
 class AppConfigTestCase(AzureRecordedTestCase):
     client = None
 
-    def create_client(self, appconfiguration_endpoint_string, audience=None):
+    def create_client(self, appconfiguration_endpoint_string, audience=_AUDIENCE_UNSET):
         cred = self.get_credential(AzureAppConfigurationClient)
-        if audience is None:
+        if audience is _AUDIENCE_UNSET:
             audience = os.environ.get("APPCONFIGURATION_AUDIENCE")
         return AzureAppConfigurationClient(appconfiguration_endpoint_string, cred, audience=audience)
 

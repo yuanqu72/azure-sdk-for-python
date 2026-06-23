@@ -466,8 +466,9 @@ class TestAppConfigurationClientAAD(AppConfigTestCase):  # pylint: disable=too-m
         self.set_up(appconfiguration_endpoint_string)
         items = list(self.client.list_revisions(tags_filter=["tag1=value1"]))
         assert len(items) >= 1
-        assert all(x.key == KEY for x in items)
-        assert all(x.label == LABEL for x in items)
+        # list_revisions returns full revision history, which on a shared live store may include
+        # revisions of other keys that previously carried this tag. Verify the filter itself instead.
+        assert all(x.tags.get("tag1") == "value1" for x in items)
         self.tear_down()
 
     @AppConfigPreparer()

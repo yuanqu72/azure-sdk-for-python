@@ -14,6 +14,14 @@ from devtools_testutils.aio import recorded_by_proxy_async
 from asynctestcase import AsyncAppConfigTestCase
 from azure.appconfiguration import (
     FeatureFlag,
+    FeatureFlagConditions,
+    FeatureFlagFilter,
+    FeatureFlagVariantDefinition,
+    FeatureFlagAllocation,
+    FeatureFlagTelemetryConfiguration,
+    PercentileAllocation,
+    UserAllocation,
+    GroupAllocation,
 )
 from azure.appconfiguration.aio import AzureAppConfigurationClient
 
@@ -224,4 +232,175 @@ class TestFeatureFlagEndpointAsync(AsyncAppConfigTestCase):
         # Clean up
         await client.delete_feature_flag("feature_with_label", label="prod")
         await client.delete_feature_flag("feature_with_label", label="staging")
+        await client.close()
+
+    @AppConfigPreparer()
+    @recorded_by_proxy_async
+    async def test_feature_flag_with_conditions(self, appconfiguration_endpoint_string):
+        """Test a feature flag that uses conditions with client filters."""
+        client = self.create_client(appconfiguration_endpoint_string)
+
+        feature_flag = FeatureFlag(
+            name="test_feature_conditions",
+            enabled=True,
+            description="A feature flag gated by client filters",
+            conditions=FeatureFlagConditions(
+                requirement_type="All",
+                client_filters=[
+                    FeatureFlagFilter(name="Microsoft.TimeWindow", parameters={"Start": "Mon, 01 Jan 2024 00:00:00 GMT"}),
+                    FeatureFlagFilter(name="Microsoft.Percentage", parameters={"Value": 50}),
+                ],
+            ),
+        )
+        created = await client.set_feature_flag(feature_flag)
+
+        retrieved = await client.get_feature_flag("test_feature_conditions", label=created.label)
+        assert retrieved is not None
+        assert retrieved.description == "A feature flag gated by client filters"
+        assert retrieved.conditions is not None
+        assert retrieved.conditions.requirement_type == "All"
+        assert retrieved.conditions.client_filters is not None
+        assert len(retrieved.conditions.client_filters) == 2
+        filter_names = {f.name for f in retrieved.conditions.client_filters}
+        assert "Microsoft.TimeWindow" in filter_names
+        assert "Microsoft.Percentage" in filter_names
+
+        await client.delete_feature_flag("test_feature_conditions", label=created.label)
+        await client.close()
+
+    @AppConfigPreparer()
+    @recorded_by_proxy_async
+    async def test_feature_flag_with_variants_and_allocation(self, appconfiguration_endpoint_string):
+        """Test a feature flag with variants and a full allocation (percentile/user/group)."""
+        client = self.create_client(appconfiguration_endpoint_string)
+
+        feature_flag = FeatureFlag(
+            name="test_feature_variants",
+            enabled=True,
+            variants=[
+                FeatureFlagVariantDefinition(name="On", value="true", status_override="Enabled"),
+                FeatureFlagVariantDefinition(name="Off", value="false", status_override="Disabled"),
+            ],
+            allocation=FeatureFlagAllocation(
+                default_when_enabled="On",
+                default_when_disabled="Off",
+                seed="test-seed",
+                percentile=[
+                    PercentileAllocation(variant="On", percentile_from=0, percentile_to=50),
+                    PercentileAllocation(variant="Off", percentile_from=50, percentile_to=100),
+                ],
+                user=[UserAllocation(variant="On", users=["alice", "bob"])],
+                group=[GroupAllocation(variant="Off", groups=["beta-testers"])],
+            ),
+        )
+        created = await client.set_feature_flag(feature_flag)
+
+        retrieved = await client.get_feature_flag("test_feature_variants", label=created.label)
+        assert retrieved is not None
+        assert retrieved.variants is not None
+        assert len(retrieved.variants) == 2
+        variant_names = {v.name for v in retrieved.variants}
+        assert variant_names == {"On", "Off"}
+
+        assert retrieved.allocation is not None
+        assert retrieved.allocation.default_when_enabled == "On"
+        assert retrieved.allocation.default_when_disabled == "Off"
+        assert retrieved.allocation.seed == "test-seed"
+        assert retrieved.allocation.percentile is not None
+        assert len(retrieved.allocation.percentile) == 2
+        assert retrieved.allocation.percentile[0].percentile_from == 0
+        assert retrieved.allocation.percentile[0].percentile_to == 50
+        assert retrieved.allocation.user is not None
+        assert retrieved.allocation.user[0].users == ["alice", "bob"]
+        assert retrieved.allocation.group is not None
+        assert retrieved.allocation.group[0].groups == ["beta-testers"]
+
+        await client.delete_feature_flag("test_feature_variants", label=created.label)
+        await client.close()
+
+    @AppConfigPreparer()
+    @recorded_by_proxy_async
+    async def test_feature_flag_with_telemetry_and_tags(self, appconfiguration_endpoint_string):
+        """Test a feature flag with telemetry configuration and tags."""
+        client = self.create_client(appconfiguration_endpoint_string)
+
+        feature_flag = FeatureFlag(
+            name="test_feature_telemetry",
+            enabled=True,
+            telemetry=FeatureFlagTelemetryConfiguration(
+                enabled=True,
+                metadata={"owner": "team-a", "tier": "premium"},
+            ),
+            tags={"env": "test", "team": "core"},
+        )
+        created = await client.set_feature_flag(feature_flag)
+
+        retrieved = await client.get_feature_flag("test_feature_telemetry", label=created.label)
+        assert retrieved is not None
+        assert retrieved.telemetry is not None
+        assert retrieved.telemetry.enabled == True
+        assert retrieved.telemetry.metadata == {"owner": "team-a", "tier": "premium"}
+        assert retrieved.tags == {"env": "test", "team": "core"}
+
+        await client.delete_feature_flag("test_feature_telemetry", label=created.label)
+        await client.close()
+
+    @AppConfigPreparer()
+    @recorded_by_proxy_async
+    async def test_feature_flag_full_model_roundtrip(self, appconfiguration_endpoint_string):
+        """Test setting and retrieving a feature flag that populates every field of the model."""
+        client = self.create_client(appconfiguration_endpoint_string)
+
+        feature_flag = FeatureFlag(
+            name="test_feature_full",
+            enabled=True,
+            label="prod",
+            description="A fully populated feature flag",
+            conditions=FeatureFlagConditions(
+                requirement_type="Any",
+                client_filters=[
+                    FeatureFlagFilter(name="Microsoft.Targeting", parameters={"Audience": {"DefaultRolloutPercentage": 25}}),
+                ],
+            ),
+            variants=[
+                FeatureFlagVariantDefinition(
+                    name="Large", value="large", content_type="text/plain", status_override="Enabled"
+                ),
+                FeatureFlagVariantDefinition(name="Small", value="small"),
+            ],
+            allocation=FeatureFlagAllocation(
+                default_when_enabled="Large",
+                default_when_disabled="Small",
+                seed="full-seed",
+                percentile=[PercentileAllocation(variant="Large", percentile_from=0, percentile_to=100)],
+                user=[UserAllocation(variant="Large", users=["carol"])],
+                group=[GroupAllocation(variant="Small", groups=["internal"])],
+            ),
+            telemetry=FeatureFlagTelemetryConfiguration(enabled=True, metadata={"source": "test"}),
+            tags={"env": "prod", "critical": "true"},
+        )
+        created = await client.set_feature_flag(feature_flag)
+
+        retrieved = await client.get_feature_flag("test_feature_full", label="prod")
+        assert retrieved is not None
+        assert retrieved.name == "test_feature_full"
+        assert retrieved.enabled == True
+        assert retrieved.label == "prod"
+        assert retrieved.description == "A fully populated feature flag"
+        assert retrieved.conditions is not None
+        assert retrieved.conditions.requirement_type == "Any"
+        assert retrieved.conditions.client_filters is not None
+        assert retrieved.conditions.client_filters[0].name == "Microsoft.Targeting"
+        assert retrieved.variants is not None
+        assert len(retrieved.variants) == 2
+        assert retrieved.variants[0].content_type == "text/plain"
+        assert retrieved.allocation is not None
+        assert retrieved.allocation.default_when_enabled == "Large"
+        assert retrieved.telemetry is not None
+        assert retrieved.telemetry.metadata == {"source": "test"}
+        assert retrieved.tags == {"env": "prod", "critical": "true"}
+        assert retrieved.etag is not None
+        assert retrieved.last_modified is not None
+
+        await client.delete_feature_flag("test_feature_full", label="prod")
         await client.close()
