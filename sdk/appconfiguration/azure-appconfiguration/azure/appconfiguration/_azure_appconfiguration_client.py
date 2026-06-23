@@ -1,4 +1,4 @@
-# pylint: disable=line-too-long,useless-suppression
+# pylint: disable=line-too-long,useless-suppression,too-many-lines
 # ------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for
@@ -86,7 +86,7 @@ class AzureAppConfigurationClient:
             audience = get_audience(base_url)
 
         # Ensure all scopes end with /.default and strip any trailing slashes before adding suffix
-        audience_scope = audience.rstrip('/') + '/' + DEFAULT_SCOPE_SUFFIX
+        audience_scope = audience.rstrip("/") + "/" + DEFAULT_SCOPE_SUFFIX
         kwargs["credential_scopes"] = [audience_scope]
 
         if isinstance(credential, AzureKeyCredential):
@@ -888,7 +888,7 @@ class AzureAppConfigurationClient:
             accept_datetime=accept_datetime,
             tags=tags_filter,
             cls=convert_to_sdk,
-            **kwargs
+            **kwargs,
         )
 
     @distributed_trace
@@ -1091,10 +1091,7 @@ class AzureAppConfigurationClient:
             return [FeatureFlag._from_generated(obj) for obj in objs]
 
         return self._impl.get_feature_flag_revisions(  # type: ignore[return-value]
-            name=feature_id_filter,
-            label=label_filter,
-            cls=convert_to_sdk,
-            **impl_kwargs
+            name=feature_id_filter, label=label_filter, cls=convert_to_sdk, **impl_kwargs
         )
 
     def update_sync_token(self, token: str) -> None:

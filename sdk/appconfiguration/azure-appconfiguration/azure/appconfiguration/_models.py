@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 # ------------------------------------
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
@@ -299,7 +300,7 @@ class FeatureFlagConfigurationSetting(ConfigurationSetting):  # pylint: disable=
     @classmethod
     def _from_feature_flag(cls, feature_flag: _GeneratedFeatureFlag) -> "FeatureFlagConfigurationSetting":
         """Create a FeatureFlagConfigurationSetting from a native FeatureFlag object.
-        
+
         :param feature_flag: The native FeatureFlag object from the Feature Flag endpoint
         :type feature_flag: ~azure.appconfiguration._generated.models.FeatureFlag
         :return: A FeatureFlagConfigurationSetting
@@ -308,7 +309,7 @@ class FeatureFlagConfigurationSetting(ConfigurationSetting):  # pylint: disable=
         filters = None
         if feature_flag.conditions and feature_flag.conditions.get("client_filters"):
             filters = feature_flag.conditions["client_filters"]
-        
+
         return cls(
             feature_id=feature_flag.name,  # type: ignore
             key=cls._key_prefix + feature_flag.name,
@@ -326,14 +327,14 @@ class FeatureFlagConfigurationSetting(ConfigurationSetting):  # pylint: disable=
 
     def _to_feature_flag(self) -> _GeneratedFeatureFlag:
         """Convert this FeatureFlagConfigurationSetting to a native FeatureFlag object.
-        
+
         :return: A native FeatureFlag object for the Feature Flag endpoint
         :rtype: ~azure.appconfiguration._generated.models.FeatureFlag
         """
         conditions = None
         if self.filters:
             conditions = {"client_filters": self.filters}
-        
+
         return _GeneratedFeatureFlag(
             name=self.feature_id,
             enabled=self.enabled,
@@ -467,20 +468,20 @@ class FeatureFlagFilter:
     :ivar name: The name of the filter. Required.
     :vartype name: str
     :ivar parameters: The parameters used by the filter.
-    :vartype parameters: dict[str, Any] or None
+    :vartype parameters: dict[str, str] or None
     """
 
     name: str
     """The name of the filter. Required."""
-    parameters: Optional[Dict[str, Any]]
+    parameters: Optional[Dict[str, str]]
     """The parameters used by the filter."""
 
-    def __init__(self, *, name: str, parameters: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, *, name: str, parameters: Optional[Dict[str, str]] = None) -> None:
         """
         :keyword name: The name of the filter. Required.
         :paramtype name: str
         :keyword parameters: The parameters used by the filter.
-        :paramtype parameters: dict[str, Any] or None
+        :paramtype parameters: dict[str, str] or None
         """
         self.name = name
         self.parameters = parameters
@@ -538,9 +539,7 @@ class FeatureFlagConditions:
     def _to_generated(self) -> _GeneratedFeatureFlagConditions:
         return _GeneratedFeatureFlagConditions(
             requirement_type=self.requirement_type,
-            filters=(
-                [f._to_generated() for f in self.client_filters] if self.client_filters is not None else None
-            ),
+            filters=([f._to_generated() for f in self.client_filters] if self.client_filters is not None else None),
         )
 
 
@@ -592,9 +591,7 @@ class FeatureFlagVariantDefinition:
         self.status_override = status_override
 
     @classmethod
-    def _from_generated(
-        cls, generated: _GeneratedFeatureFlagVariantDefinition
-    ) -> "FeatureFlagVariantDefinition":
+    def _from_generated(cls, generated: _GeneratedFeatureFlagVariantDefinition) -> "FeatureFlagVariantDefinition":
         return cls(
             name=generated.name,
             value=generated.value,
@@ -793,15 +790,9 @@ class FeatureFlagAllocation:
                 if generated.percentile is not None
                 else None
             ),
-            user=(
-                [UserAllocation._from_generated(u) for u in generated.user]
-                if generated.user is not None
-                else None
-            ),
+            user=([UserAllocation._from_generated(u) for u in generated.user] if generated.user is not None else None),
             group=(
-                [GroupAllocation._from_generated(g) for g in generated.group]
-                if generated.group is not None
-                else None
+                [GroupAllocation._from_generated(g) for g in generated.group] if generated.group is not None else None
             ),
             seed=generated.seed,
         )
@@ -810,9 +801,7 @@ class FeatureFlagAllocation:
         return _GeneratedFeatureFlagAllocation(
             default_when_disabled=self.default_when_disabled,
             default_when_enabled=self.default_when_enabled,
-            percentile=(
-                [p._to_generated() for p in self.percentile] if self.percentile is not None else None
-            ),
+            percentile=([p._to_generated() for p in self.percentile] if self.percentile is not None else None),
             user=[u._to_generated() for u in self.user] if self.user is not None else None,
             group=[g._to_generated() for g in self.group] if self.group is not None else None,
             seed=self.seed,
@@ -855,7 +844,7 @@ class FeatureFlagTelemetryConfiguration:
 
 class FeatureFlag(Model):
     """A feature flag used with the dedicated feature flag endpoints.
-    
+
     This model represents a feature flag and is used exclusively with the
     feature flag-specific API endpoints (set_feature_flag, get_feature_flag, etc).
     """
@@ -946,7 +935,7 @@ class FeatureFlag(Model):
     @classmethod
     def _from_generated(cls, generated: _GeneratedFeatureFlag) -> "FeatureFlag":
         """Create an SDK FeatureFlag from a generated FeatureFlag object.
-        
+
         :param generated: The generated FeatureFlag object
         :type generated: ~azure.appconfiguration._generated.models.FeatureFlag
         :return: An SDK FeatureFlag
@@ -984,7 +973,7 @@ class FeatureFlag(Model):
 
     def _to_generated(self) -> _GeneratedFeatureFlag:
         """Convert this SDK FeatureFlag to a generated FeatureFlag object.
-        
+
         :return: A generated FeatureFlag
         :rtype: ~azure.appconfiguration._generated.models.FeatureFlag
         """
@@ -994,9 +983,7 @@ class FeatureFlag(Model):
             label=self.label,
             description=self.description,
             conditions=self.conditions._to_generated() if self.conditions is not None else None,
-            variants=(
-                [v._to_generated() for v in self.variants] if self.variants is not None else None
-            ),
+            variants=([v._to_generated() for v in self.variants] if self.variants is not None else None),
             allocation=self.allocation._to_generated() if self.allocation is not None else None,
             telemetry=self.telemetry._to_generated() if self.telemetry is not None else None,
             tags=self.tags,

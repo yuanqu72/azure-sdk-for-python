@@ -1044,7 +1044,7 @@ def build_azure_app_configuration_get_labels_request(  # pylint: disable=name-to
     if select is not None:
         _params["$Select"] = _SERIALIZER.query("select", select, "[str]", div=",")
     if resource_type is not None:
-        _params["resource-type"] = _SERIALIZER.query("resource_type", resource_type, "str")
+        _params["resourceType"] = _SERIALIZER.query("resource_type", resource_type, "str")
 
     # Construct headers
     if sync_token is not None:
@@ -1082,7 +1082,7 @@ def build_azure_app_configuration_check_labels_request(  # pylint: disable=name-
     if select is not None:
         _params["$Select"] = _SERIALIZER.query("select", select, "[str]", div=",")
     if resource_type is not None:
-        _params["resource-type"] = _SERIALIZER.query("resource_type", resource_type, "str")
+        _params["resourceType"] = _SERIALIZER.query("resource_type", resource_type, "str")
 
     # Construct headers
     if sync_token is not None:
