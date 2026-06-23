@@ -331,6 +331,24 @@ for config_setting in config_settings:
 
 <!-- END SNIPPET -->
 
+You can also filter labels by the type of resource they belong to with `resource_type`, using `"kv"` for key-value settings or `"ff"` for feature flags.
+
+<!-- SNIPPET:list_labels_sample.list_labels_by_resource_type -->
+
+```python
+print("List labels used by key-value settings only")
+config_settings = client.list_labels(resource_type="kv")
+for config_setting in config_settings:
+    print(config_setting)
+
+print("List labels used by feature flags only")
+config_settings = client.list_labels(resource_type="ff")
+for config_setting in config_settings:
+    print(config_setting)
+```
+
+<!-- END SNIPPET -->
+
 ### Create a Snapshot
 
 <!-- SNIPPET:snapshot_sample.create_snapshot -->

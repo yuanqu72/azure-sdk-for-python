@@ -41,6 +41,7 @@ from azure.appconfiguration import (
     ConfigurationSettingsFilter,
     SecretReferenceConfigurationSetting,
     FeatureFlagConfigurationSetting,
+    FeatureFlag,
     FILTER_PERCENTAGE,
     FILTER_TARGETING,
     FILTER_TIME_WINDOW,
@@ -1288,6 +1289,31 @@ class TestAppConfigurationClientAAD(AppConfigTestCase):  # pylint: disable=too-m
         self.tear_down()
         rep = self.client.list_labels()
         assert len(list(rep)) == 0
+
+    @AppConfigPreparer()
+    @recorded_by_proxy
+    def test_list_labels_resource_type(self, appconfiguration_endpoint_string):
+        self.set_up(appconfiguration_endpoint_string)
+        # set_up creates key-value settings labeled LABEL. Add a dedicated feature flag
+        # (written through the feature-flag endpoint) with a distinct label so we can
+        # verify resource_type segregates key-value labels ('kv') from feature-flag
+        # labels ('ff').
+        ff_label = "ff_resource_type_" + LABEL
+        feature_flag = FeatureFlag(name="resource_type_feature", enabled=True, label=ff_label)
+        self.client.set_feature_flag(feature_flag)
+        try:
+            # resource_type="kv" returns labels used by key-value settings only.
+            kv_labels = {item.name for item in self.client.list_labels(resource_type="kv")}
+            assert LABEL in kv_labels
+            assert ff_label not in kv_labels
+
+            # resource_type="ff" returns labels used by feature flags only.
+            ff_labels = {item.name for item in self.client.list_labels(resource_type="ff")}
+            assert ff_label in ff_labels
+            assert LABEL not in ff_labels
+        finally:
+            self.client.delete_feature_flag("resource_type_feature", label=ff_label)
+            self.tear_down()
 
 
 class TestAppConfigurationClientUnitTest:

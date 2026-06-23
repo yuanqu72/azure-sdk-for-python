@@ -41,6 +41,7 @@ from azure.appconfiguration import (
     ConfigurationSettingsFilter,
     SecretReferenceConfigurationSetting,
     FeatureFlagConfigurationSetting,
+    FeatureFlag,
     FILTER_PERCENTAGE,
     FILTER_TARGETING,
     FILTER_TIME_WINDOW,
@@ -1334,6 +1335,32 @@ class TestAppConfigurationClientAADAsync(AsyncAppConfigTestCase):  # pylint: dis
 
         rep = await self.convert_to_list(self.client.list_labels())
         assert len(list(rep)) == 0
+        await self.client.close()
+
+    @AppConfigPreparer()
+    @recorded_by_proxy_async
+    async def test_list_labels_resource_type(self, appconfiguration_endpoint_string):
+        await self.set_up(appconfiguration_endpoint_string)
+        # set_up creates key-value settings labeled LABEL. Add a dedicated feature flag
+        # (written through the feature-flag endpoint) with a distinct label so we can
+        # verify resource_type segregates key-value labels ('kv') from feature-flag
+        # labels ('ff').
+        ff_label = "ff_resource_type_" + LABEL
+        feature_flag = FeatureFlag(name="resource_type_feature", enabled=True, label=ff_label)
+        await self.client.set_feature_flag(feature_flag)
+        try:
+            # resource_type="kv" returns labels used by key-value settings only.
+            kv_labels = {item.name for item in await self.convert_to_list(self.client.list_labels(resource_type="kv"))}
+            assert LABEL in kv_labels
+            assert ff_label not in kv_labels
+
+            # resource_type="ff" returns labels used by feature flags only.
+            ff_labels = {item.name for item in await self.convert_to_list(self.client.list_labels(resource_type="ff"))}
+            assert ff_label in ff_labels
+            assert LABEL not in ff_labels
+        finally:
+            await self.client.delete_feature_flag("resource_type_feature", label=ff_label)
+            await self.tear_down()
         await self.client.close()
 
 

@@ -652,6 +652,7 @@ class AzureAppConfigurationClient:
         after: Optional[str] = None,
         accept_datetime: Optional[Union[datetime, str]] = None,
         fields: Optional[List[Union[str, LabelFields]]] = None,
+        resource_type: Optional[str] = None,
         **kwargs: Any,
     ) -> AsyncItemPaged[ConfigurationSettingLabel]:
         """Gets a list of labels.
@@ -669,6 +670,9 @@ class AzureAppConfigurationClient:
         :keyword fields: Specify which fields to include in the results. If not specified, will include all fields.
             Available fields see :class:`~azure.appconfiguration.LabelFields`.
         :paramtype fields: list[str] or list[~azure.appconfiguration.LabelFields] or None
+        :keyword resource_type: A filter used to indicate the resource type of the labels. Accepted values:
+            'kv' for key-value labels, 'ff' for feature flag labels. Default is `None`.
+        :paramtype resource_type: str or None
         :return: An async iterator of labels.
         :rtype: ~azure.core.async_paging.AsyncItemPaged[~azure.appconfiguration.ConfigurationSettingLabel]
         :raises: :class:`~azure.core.exceptions.HttpResponseError`
@@ -680,6 +684,7 @@ class AzureAppConfigurationClient:
             after=after,
             accept_datetime=accept_datetime,
             select=fields,
+            resource_type=resource_type,
             cls=lambda objs: [ConfigurationSettingLabel(name=x.name) for x in objs],
             **kwargs,
         )
