@@ -527,6 +527,7 @@ class FeatureFlagConditions:
 
     @classmethod
     def _from_generated(cls, generated: _GeneratedFeatureFlagConditions) -> "FeatureFlagConditions":
+        # pylint:disable=protected-access
         return cls(
             requirement_type=generated.requirement_type,
             client_filters=(
@@ -537,6 +538,7 @@ class FeatureFlagConditions:
         )
 
     def _to_generated(self) -> _GeneratedFeatureFlagConditions:
+        # pylint:disable=protected-access
         return _GeneratedFeatureFlagConditions(
             requirement_type=self.requirement_type,
             filters=([f._to_generated() for f in self.client_filters] if self.client_filters is not None else None),
@@ -782,6 +784,7 @@ class FeatureFlagAllocation:
 
     @classmethod
     def _from_generated(cls, generated: _GeneratedFeatureFlagAllocation) -> "FeatureFlagAllocation":
+        # pylint:disable=protected-access
         return cls(
             default_when_disabled=generated.default_when_disabled,
             default_when_enabled=generated.default_when_enabled,
@@ -798,6 +801,7 @@ class FeatureFlagAllocation:
         )
 
     def _to_generated(self) -> _GeneratedFeatureFlagAllocation:
+        # pylint:disable=protected-access
         return _GeneratedFeatureFlagAllocation(
             default_when_disabled=self.default_when_disabled,
             default_when_enabled=self.default_when_enabled,
@@ -842,7 +846,7 @@ class FeatureFlagTelemetryConfiguration:
         return _GeneratedFeatureFlagTelemetryConfiguration(enabled=self.enabled, metadata=self.metadata)
 
 
-class FeatureFlag(Model):
+class FeatureFlag(Model):  # pylint: disable=too-many-instance-attributes
     """A feature flag used with the dedicated feature flag endpoints.
 
     This model represents a feature flag and is used exclusively with the
@@ -920,6 +924,7 @@ class FeatureFlag(Model):
         :keyword tags: The tags of the feature flag.
         :paramtype tags: dict[str, str] or None
         """
+        super().__init__(**kwargs)
         self.name = name
         self.enabled = enabled if enabled is not None else False
         self.label = label
@@ -941,6 +946,7 @@ class FeatureFlag(Model):
         :return: An SDK FeatureFlag
         :rtype: ~azure.appconfiguration.FeatureFlag
         """
+        # pylint:disable=protected-access
         return cls(
             name=generated.name,
             enabled=generated.enabled,
@@ -977,6 +983,7 @@ class FeatureFlag(Model):
         :return: A generated FeatureFlag
         :rtype: ~azure.appconfiguration._generated.models.FeatureFlag
         """
+        # pylint:disable=protected-access
         return _GeneratedFeatureFlag(
             name=self.name,
             enabled=self.enabled,
@@ -1185,178 +1192,6 @@ class ConfigurationSettingLabel:
 
 def _return_deserialized_and_headers(_, deserialized, response_headers):
     return deserialized, response_headers
-
-
-class FeatureFlagConfigurationSettingPropertiesPagedBase:  # pylint:disable=too-many-instance-attributes
-    """Base class for iterable of FeatureFlagConfigurationSetting properties."""
-
-    etag: str
-    """The current etag"""
-    _etags: List[str]
-    """The etag expected for the pages."""
-    _command: Callable
-    """The command to get the next page"""
-    _key: Optional[str]
-    """The key filter for the items"""
-    _label: Optional[str]
-    """The label filter for the items"""
-    _accept_datetime: Optional[str]
-    """The accept datetime for the items"""
-    _select: Optional[List[Union[str, Any]]]
-    """The select fields for the items"""
-    _tags: Optional[List[str]]
-    """The tags filter for the items"""
-    _snapshot: Optional[str]
-    """The snapshot name for the items"""
-    _match_condition: Optional[MatchConditions]
-    """The match condition"""
-    _kwargs: Dict[str, Any]
-    """The keyword arguments"""
-
-    def __init__(self, command: Callable, **kwargs: Any):
-        self._command = command
-        self._key = kwargs.pop("key", None)
-        self._label = kwargs.pop("label", None)
-        self._accept_datetime = kwargs.pop("accept_datetime", None)
-        self._select = kwargs.pop("select", None)
-        self._tags = kwargs.pop("tags", None)
-        self._snapshot = kwargs.pop("snapshot", None)
-        self._match_condition = kwargs.pop("match_condition", None)
-        self._kwargs = kwargs
-        self._etags: List[str] = []
-
-    def _next_etag(self) -> Optional[str]:
-        if self._etags:
-            etag = self._etags.pop(0)
-            return etag
-        return None
-
-    def _extract_data_cb_base(self, get_next_return):
-        etags, data = get_next_return
-        self.etag = etags
-        return data
-
-    def _page_iterator_class(self, **kwargs: Any) -> PageIterator:
-        raise NotImplementedError()
-
-
-class FeatureFlagConfigurationSettingPropertiesPaged(
-    FeatureFlagConfigurationSettingPropertiesPagedBase, PageIterator
-):  # pylint:disable=too-many-instance-attributes
-    """An iterable of FeatureFlagConfigurationSetting properties."""
-
-    def __init__(self, command: Callable, **kwargs: Any):
-        super().__init__(command, **kwargs)
-        PageIterator.__init__(
-            self,
-            self._get_next_cb,
-            self._extract_data_cb,
-            continuation_token=kwargs.get("continuation_token"),
-        )
-
-    def _get_next_cb(self, continuation_token, **kwargs):
-        etag = self._next_etag()
-        return self._command(
-            name=self._key,
-            label=self._label,
-            accept_datetime=self._accept_datetime,
-            select=self._select,
-            tags=self._tags,
-            etag=etag,
-            match_condition=self._match_condition,
-            continuation_token=continuation_token,
-            cls=kwargs.pop("cls", None) or _return_deserialized_and_headers,
-        )
-
-    def _extract_data_cb(self, get_next_return):
-        return self._extract_data_cb_base(get_next_return)
-
-    def __next__(self) -> Iterator[ReturnType]:
-        """Get the next page in the iterator.
-
-        :returns: An iterator of objects in the next page.
-        :rtype: iterator[ReturnType]
-        :raises StopIteration: If there are no more pages to return.
-        :raises AzureError: If the request fails.
-        """
-        # Is the exact same method as `PageIterator`, excluding the if statement before the return.
-        if self.continuation_token is None and self._did_a_call_already:
-            raise StopIteration("End of paging")
-        try:
-            self._response = self._get_next(self.continuation_token)
-        except AzureError as error:
-            if not error.continuation_token:
-                error.continuation_token = self.continuation_token
-            raise
-
-        self._did_a_call_already = True
-
-        self.continuation_token, self._current_page = self._extract_data(self._response)
-
-        # App Config's addition to skip empty pages
-        if self._current_page is None:
-            # We skip over pages that are empty, change from mach conditions
-            return self.__next__()
-        return iter(self._current_page)
-
-
-class FeatureFlagConfigurationSettingPropertiesPagedAsync(
-    FeatureFlagConfigurationSettingPropertiesPagedBase, AsyncPageIterator
-):  # pylint:disable=too-many-instance-attributes
-    """An async iterable of FeatureFlagConfigurationSetting properties."""
-
-    def __init__(self, command: Callable, **kwargs: Any):
-        super().__init__(command, **kwargs)
-        AsyncPageIterator.__init__(
-            self,
-            self._get_next_cb,
-            self._extract_data_cb,
-            continuation_token=kwargs.get("continuation_token"),
-        )
-
-    def _get_next_cb(self, continuation_token, **kwargs):
-        etag = self._next_etag()
-        return self._command(
-            name=self._key,
-            label=self._label,
-            accept_datetime=self._accept_datetime,
-            select=self._select,
-            tags=self._tags,
-            etag=etag,
-            match_condition=self._match_condition,
-            continuation_token=continuation_token,
-            cls=kwargs.pop("cls", None) or _return_deserialized_and_headers,
-        )
-
-    def _extract_data_cb(self, get_next_return):
-        return self._extract_data_cb_base(get_next_return)
-
-    async def __anext__(self):
-        """Get the next page in the async iterator.
-
-        :returns: An async iterator of objects in the next page.
-        :rtype: async_iterator[ReturnType]
-        :raises StopAsyncIteration: If there are no more pages to return.
-        :raises AzureError: If the request fails.
-        """
-        if self.continuation_token is None and self._did_a_call_already:
-            raise StopAsyncIteration("End of paging")  # pylint: disable=raise-missing-from
-        try:
-            self._response = await self._get_next(self.continuation_token)
-        except AzureError as error:
-            if not error.continuation_token:
-                error.continuation_token = self.continuation_token
-            raise
-
-        self._did_a_call_already = True
-
-        self.continuation_token, self._current_page = self._extract_data(self._response)
-
-        # App Config's addition to skip empty pages
-        if self._current_page is None:
-            # We skip over pages that are empty, change from mach conditions
-            return await self.__anext__()
-        return self._current_page
 
 
 class ConfigurationSettingPropertiesPagedBase:  # pylint:disable=too-many-instance-attributes
@@ -1623,61 +1458,6 @@ class AsyncConfigurationSettingPaged(AsyncItemPaged[ConfigurationSetting]):
     If the page has not changed (HTTP 304), it is skipped. If the page has changed (HTTP 200),
     the new page is returned. This allows efficient polling for changes without retrieving
     unchanged data.
-    """
-
-    def by_page(self, continuation_token: Optional[str] = None, *, match_conditions: Optional[List[str]] = None) -> Any:
-        """Get an async iterator of pages of objects, instead of an iterator of objects.
-
-        :param str continuation_token:
-            An opaque continuation token. This value can be retrieved from the
-            continuation_token field of a previous generator object. If specified,
-            this generator will begin returning results from this point.
-        :keyword match_conditions: A list of etags to check for changes. If provided, the iterator will
-            check each page against the corresponding etag and only return pages that have changed.
-        :paramtype match_conditions: list[str] or None
-        :returns: An async iterator of pages (themselves iterator of objects)
-        :rtype: AsyncIterator[AsyncIterator[ReturnType]]
-        """
-        if "match_conditions" not in self._kwargs and match_conditions:
-            self._kwargs["etags"] = match_conditions
-            self._kwargs["match_condition"] = MatchConditions.IfModified
-        return self._page_iterator_class(continuation_token=continuation_token, *self._args, **self._kwargs)
-
-
-class FeatureFlagConfigurationSettingPaged(ItemPaged["FeatureFlagConfigurationSetting"]):
-    """
-    An iterable of FeatureFlagConfigurationSettings that supports etag-based change detection.
-
-    This class extends ItemPaged to provide efficient monitoring of feature flag configuration changes
-    by using ETags. When used with the `match_conditions` parameter in `by_page()`,
-    it only returns pages that have changed since the provided ETags were collected.
-    """
-
-    def by_page(self, continuation_token: Optional[str] = None, *, match_conditions: Optional[List[str]] = None) -> Any:
-        """Get an iterator of pages of objects, instead of an iterator of objects.
-
-        :param str continuation_token:
-            An opaque continuation token. This value can be retrieved from the
-            continuation_token field of a previous generator object. If specified,
-            this generator will begin returning results from this point.
-        :keyword match_conditions: A list of etags to check for changes. If provided, the iterator will
-            check each page against the corresponding etag and only return pages that have changed.
-        :paramtype match_conditions: list[str] or None
-        :returns: An iterator of pages (themselves iterator of objects)
-        :rtype: iterator[iterator[ReturnType]]
-        """
-        if "match_conditions" not in self._kwargs and match_conditions:
-            self._kwargs["etags"] = match_conditions
-            self._kwargs["match_condition"] = MatchConditions.IfModified
-        return self._page_iterator_class(continuation_token=continuation_token, *self._args, **self._kwargs)
-
-
-class AsyncFeatureFlagConfigurationSettingPaged(AsyncItemPaged["FeatureFlagConfigurationSetting"]):
-    """
-    An async iterable of FeatureFlagConfigurationSettings that supports etag-based change detection.
-
-    This class provides asynchronous iteration over feature flag configuration settings, with optional support for
-    etag-based change detection.
     """
 
     def by_page(self, continuation_token: Optional[str] = None, *, match_conditions: Optional[List[str]] = None) -> Any:

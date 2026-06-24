@@ -34,7 +34,6 @@ from ._models import (
     ConfigurationSettingsFilter,
     ConfigurationSnapshot,
     ConfigurationSettingLabel,
-    FeatureFlagConfigurationSetting,
     FeatureFlag,
 )
 from ._audience import get_audience, DEFAULT_SCOPE_SUFFIX
@@ -48,7 +47,7 @@ from ._sync_token import SyncTokenPolicy
 from ._audience_error_handling_policy import AudienceErrorHandlingPolicy
 
 
-class AzureAppConfigurationClient:
+class AzureAppConfigurationClient:  # pylint: disable=too-many-public-methods
     """Represents a client that calls restful API of Azure App Configuration service.
 
     :param str base_url: Base url of the service.
@@ -998,7 +997,7 @@ class AzureAppConfigurationClient:
         return FeatureFlag._from_generated(generated_result)
 
     @distributed_trace
-    def delete_feature_flag(
+    def delete_feature_flag(  # pylint:disable=delete-operation-wrong-return-type
         self,
         feature_id: str,
         label: Optional[str] = None,

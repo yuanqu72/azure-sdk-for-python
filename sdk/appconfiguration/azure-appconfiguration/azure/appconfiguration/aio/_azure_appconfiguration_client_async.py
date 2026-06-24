@@ -48,7 +48,7 @@ from .._utils import (
 from .._audience_error_handling_policy import AudienceErrorHandlingPolicy
 
 
-class AzureAppConfigurationClient:
+class AzureAppConfigurationClient:  # pylint: disable=too-many-public-methods
     """Represents a client that calls restful API of Azure App Configuration service.
 
     :param str base_url: Base url of the service.
@@ -943,6 +943,7 @@ class AzureAppConfigurationClient:
         self,
         feature_flag: "FeatureFlag",
         match_condition: MatchConditions = MatchConditions.Unconditionally,
+        *,
         etag: Optional[str] = None,
         **kwargs: Any,
     ) -> "FeatureFlag":
@@ -951,8 +952,8 @@ class AzureAppConfigurationClient:
 
         :param feature_flag: A FeatureFlag object.
         :type feature_flag: ~azure.appconfiguration.FeatureFlag
-        :keyword match_condition: The match condition to use upon the etag.
-        :paramtype match_condition: ~azure.core.MatchConditions
+        :param match_condition: The match condition to use upon the etag.
+        :type match_condition: ~azure.core.MatchConditions
         :keyword etag: The etag of the feature flag. If provided, the feature flag will be updated only if the etag matches.
         :paramtype etag: str or None
         :return: The updated FeatureFlag.
@@ -986,21 +987,33 @@ class AzureAppConfigurationClient:
         etag: Optional[str] = None,
         match_condition: MatchConditions = MatchConditions.Unconditionally,
         **kwargs: Any,
-    ) -> Optional["FeatureFlag"]:
-        """
-        Delete a feature flag from the service.
+    ) -> Union[None, "FeatureFlag"]:
+        """Delete a FeatureFlag if it exists
 
-        :param feature_id: The feature flag identifier.
+        :param feature_id: The feature flag name/id to delete
         :type feature_id: str
-        :param label: The label of the feature flag. Defaults to None.
+        :param label: Label used to identify the FeatureFlag. Default is `None`.
         :type label: str or None
-        :keyword etag: Check if the feature flag is changed. Set None to skip checking etag.
+        :keyword etag: Check if the FeatureFlag is changed. Set None to skip checking etag
         :paramtype etag: str or None
-        :keyword match_condition: The match condition to use upon the etag.
+        :keyword match_condition: The match condition to use upon the etag
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: The deleted FeatureFlag, or None if not found.
+        :return: The deleted FeatureFlag returned from the service, or None if it doesn't exist.
         :rtype: ~azure.appconfiguration.FeatureFlag or None
-        :raises: :class:`~azure.core.exceptions.HttpResponseError`
+        :raises: :class:`~azure.appconfiguration.ResourceReadOnlyError`, \
+            :class:`~azure.core.exceptions.HttpResponseError`, \
+            :class:`~azure.core.exceptions.ClientAuthenticationError`, \
+            :class:`~azure.core.exceptions.ResourceModifiedError`, \
+            :class:`~azure.core.exceptions.ResourceNotModifiedError`, \
+            :class:`~azure.core.exceptions.ResourceNotFoundError`, \
+            :class:`~azure.core.exceptions.ResourceExistsError`
+
+        Example
+
+        .. code-block:: python
+
+            # in async function
+            deleted_feature_flag = await async_client.delete_feature_flag(feature_id="MyFeatureFlag")
         """
         error_map: Dict[int, Any] = {409: ResourceReadOnlyError}
         generated_feature_flag = await self._impl.delete_feature_flag(
