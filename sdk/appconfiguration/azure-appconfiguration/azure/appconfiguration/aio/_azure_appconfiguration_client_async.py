@@ -861,7 +861,7 @@ class AzureAppConfigurationClient:  # pylint: disable=too-many-public-methods
         tags_filter: Optional[List[str]] = None,
         accept_datetime: Optional[Union[datetime, str]] = None,
         **kwargs: Any,
-    ) -> AsyncConfigurationSettingPaged:
+    ) -> AsyncItemPaged["FeatureFlag"]:
         """
         Find the FeatureFlag objects, optionally filtered by name, label, tags and accept_datetime.
 
@@ -1036,7 +1036,7 @@ class AzureAppConfigurationClient:  # pylint: disable=too-many-public-methods
         *,
         accept_datetime: Optional[Union[datetime, str]] = None,
         **kwargs: Any,
-    ) -> AsyncConfigurationSettingPaged:
+    ) -> AsyncItemPaged["FeatureFlag"]:
         """
         Find the FeatureFlag revision history, optionally filtered by feature_id and label.
 

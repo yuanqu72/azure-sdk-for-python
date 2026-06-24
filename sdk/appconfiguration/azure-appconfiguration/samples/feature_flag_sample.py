@@ -67,7 +67,7 @@ def main():
             requirement_type="All",
             client_filters=[
                 FeatureFlagFilter(name="Microsoft.TimeWindow", parameters={"Start": "Mon, 01 Jan 2024 00:00:00 GMT"}),
-                FeatureFlagFilter(name="Microsoft.Percentage", parameters={"Value": 50}),
+                FeatureFlagFilter(name="Microsoft.Percentage", parameters={"Value": "50"}),
             ],
         ),
         # Variants describe the possible values the feature can resolve to.
@@ -95,10 +95,14 @@ def main():
     fetched = client.get_feature_flag("RichFeature")
     if fetched is not None:
         print(f"  name={fetched.name}")
-        print(f"  requirement_type={fetched.conditions.requirement_type}")
-        print(f"  variants={[v.name for v in fetched.variants]}")
-        print(f"  default_when_enabled={fetched.allocation.default_when_enabled}")
-        print(f"  telemetry_enabled={fetched.telemetry.enabled}")
+        if fetched.conditions is not None:
+            print(f"  requirement_type={fetched.conditions.requirement_type}")
+        if fetched.variants is not None:
+            print(f"  variants={[v.name for v in fetched.variants]}")
+        if fetched.allocation is not None:
+            print(f"  default_when_enabled={fetched.allocation.default_when_enabled}")
+        if fetched.telemetry is not None:
+            print(f"  telemetry_enabled={fetched.telemetry.enabled}")
         print(f"  tags={fetched.tags}")
     print("")
 

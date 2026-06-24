@@ -297,54 +297,6 @@ class FeatureFlagConfigurationSetting(ConfigurationSetting):  # pylint: disable=
             etag=self.etag,
         )
 
-    @classmethod
-    def _from_feature_flag(cls, feature_flag: _GeneratedFeatureFlag) -> "FeatureFlagConfigurationSetting":
-        """Create a FeatureFlagConfigurationSetting from a native FeatureFlag object.
-
-        :param feature_flag: The native FeatureFlag object from the Feature Flag endpoint
-        :type feature_flag: ~azure.appconfiguration._generated.models.FeatureFlag
-        :return: A FeatureFlagConfigurationSetting
-        :rtype: ~azure.appconfiguration.FeatureFlagConfigurationSetting
-        """
-        filters = None
-        if feature_flag.conditions and feature_flag.conditions.get("client_filters"):
-            filters = feature_flag.conditions["client_filters"]
-
-        return cls(
-            feature_id=feature_flag.name,  # type: ignore
-            key=cls._key_prefix + feature_flag.name,
-            label=feature_flag.label,
-            content_type=cls._feature_flag_content_type,
-            last_modified=feature_flag.last_modified,
-            tags=feature_flag.tags or {},
-            read_only=False,  # FeatureFlag doesn't have a read_only field
-            etag=feature_flag.etag,
-            enabled=feature_flag.enabled or False,
-            filters=filters,
-            display_name=None,
-            description=feature_flag.description,
-        )
-
-    def _to_feature_flag(self) -> _GeneratedFeatureFlag:
-        """Convert this FeatureFlagConfigurationSetting to a native FeatureFlag object.
-
-        :return: A native FeatureFlag object for the Feature Flag endpoint
-        :rtype: ~azure.appconfiguration._generated.models.FeatureFlag
-        """
-        conditions = None
-        if self.filters:
-            conditions = {"client_filters": self.filters}
-
-        return _GeneratedFeatureFlag(
-            name=self.feature_id,
-            enabled=self.enabled,
-            label=self.label,
-            description=self.description,
-            conditions=conditions,
-            tags=self.tags,
-            etag=self.etag,
-        )
-
 
 class SecretReferenceConfigurationSetting(ConfigurationSetting):
     """A configuration value that references a configuration setting secret."""
@@ -985,9 +937,7 @@ class FeatureFlag(Model):  # pylint: disable=too-many-instance-attributes
         """
         # pylint:disable=protected-access
         return _GeneratedFeatureFlag(
-            name=self.name,
             enabled=self.enabled,
-            label=self.label,
             description=self.description,
             conditions=self.conditions._to_generated() if self.conditions is not None else None,
             variants=([v._to_generated() for v in self.variants] if self.variants is not None else None),
