@@ -14,6 +14,7 @@ from consts import (
 from devtools_testutils import AzureRecordedTestCase
 from azure.appconfiguration import (
     AzureAppConfigurationClient,
+    FeatureFlagClient,
     ConfigurationSetting,
     FeatureFlagConfigurationSetting,
     SecretReferenceConfigurationSetting,
@@ -33,6 +34,12 @@ class AppConfigTestCase(AzureRecordedTestCase):
         if audience is _AUDIENCE_UNSET:
             audience = os.environ.get("APPCONFIGURATION_AUDIENCE")
         return AzureAppConfigurationClient(appconfiguration_endpoint_string, cred, audience=audience)
+
+    def create_feature_flag_client(self, appconfiguration_endpoint_string, audience=_AUDIENCE_UNSET):
+        cred = self.get_credential(FeatureFlagClient)
+        if audience is _AUDIENCE_UNSET:
+            audience = os.environ.get("APPCONFIGURATION_AUDIENCE")
+        return FeatureFlagClient(appconfiguration_endpoint_string, cred, audience=audience)
 
     def create_config_setting(self):
         return ConfigurationSetting(

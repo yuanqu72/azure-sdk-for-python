@@ -1346,8 +1346,9 @@ class TestAppConfigurationClientAADAsync(AsyncAppConfigTestCase):  # pylint: dis
         # verify resource_type segregates key-value labels ('kv') from feature-flag
         # labels ('ff').
         ff_label = "ff_resource_type_" + LABEL
+        ff_client = self.create_feature_flag_client(appconfiguration_endpoint_string)
         feature_flag = FeatureFlag(name="resource_type_feature", enabled=True, label=ff_label)
-        await self.client.set_feature_flag(feature_flag)
+        await ff_client.set_feature_flag(feature_flag)
         try:
             # resource_type="kv" returns labels used by key-value settings only.
             kv_labels = {item.name for item in await self.convert_to_list(self.client.list_labels(resource_type="kv"))}
@@ -1359,7 +1360,8 @@ class TestAppConfigurationClientAADAsync(AsyncAppConfigTestCase):  # pylint: dis
             assert ff_label in ff_labels
             assert LABEL not in ff_labels
         finally:
-            await self.client.delete_feature_flag("resource_type_feature", label=ff_label)
+            await ff_client.delete_feature_flag("resource_type_feature", label=ff_label)
+            await ff_client.close()
             await self.tear_down()
         await self.client.close()
 

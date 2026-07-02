@@ -588,16 +588,16 @@ class PercentileAllocation(_Model):
     :ivar variant: The variant to allocate these percentiles to. Required.
     :vartype variant: str
     :ivar from_property: The lower bounds for this percentile allocation. Required.
-    :vartype from_property: int
+    :vartype from_property: float
     :ivar to: The upper bounds for this percentile allocation. Required.
-    :vartype to: int
+    :vartype to: float
     """
 
     variant: str = rest_field(visibility=["read", "create", "update", "delete", "query"])
     """The variant to allocate these percentiles to. Required."""
-    from_property: int = rest_field(name="from", visibility=["read", "create", "update", "delete", "query"])
+    from_property: float = rest_field(name="from", visibility=["read", "create", "update", "delete", "query"])
     """The lower bounds for this percentile allocation. Required."""
-    to: int = rest_field(visibility=["read", "create", "update", "delete", "query"])
+    to: float = rest_field(visibility=["read", "create", "update", "delete", "query"])
     """The upper bounds for this percentile allocation. Required."""
 
     @overload
@@ -605,8 +605,8 @@ class PercentileAllocation(_Model):
         self,
         *,
         variant: str,
-        from_property: int,
-        to: int,
+        from_property: float,
+        to: float,
     ) -> None: ...
 
     @overload

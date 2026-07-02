@@ -1,8 +1,13 @@
 # Release History
 
-## 1.9.1 (Unreleased)
+## 1.10.0b1 (Unreleased)
 
 ### Features Added
+
+- Added `FeatureFlagClient` (sync and async) for managing feature flags through a dedicated endpoint (requires API version `2026-05-01-preview` or later):
+  - Exposes `set_feature_flag()`, `get_feature_flag()`, `list_feature_flags()`, `delete_feature_flag()`, `add_feature_flag()`, `list_feature_flag_revisions()`, and `list_labels()`.
+  - `FeatureFlagClient` is available from `azure.appconfiguration` (sync) and `azure.appconfiguration.aio` (async).
+  - Added the `FeatureFlag` model along with `FeatureFlagConditions`, `FeatureFlagFilter`, `FeatureFlagVariantDefinition`, `FeatureFlagAllocation`, `FeatureFlagTelemetryConfiguration`, `PercentileAllocation`, `UserAllocation`, and `GroupAllocation`.
 
 ### Breaking Changes
 

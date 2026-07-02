@@ -10,6 +10,7 @@
 # --------------------------------------------------------------------------
 
 from ._azure_appconfiguration_client import AzureAppConfigurationClient
+from ._feature_flag_client import FeatureFlagClient
 from ._constants import FILTER_PERCENTAGE, FILTER_TARGETING, FILTER_TIME_WINDOW
 from ._models import (
     ConfigurationSetting,
@@ -43,6 +44,7 @@ from ._azure_appconfiguration_error import ResourceReadOnlyError
 __version__ = VERSION
 __all__ = [
     "AzureAppConfigurationClient",
+    "FeatureFlagClient",
     "ConfigurationSetting",
     "ResourceReadOnlyError",
     "FeatureFlagConfigurationSetting",

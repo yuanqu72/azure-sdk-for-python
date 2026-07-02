@@ -23,7 +23,7 @@ USAGE: python feature_flag_sample_async.py
 import asyncio
 import os
 from azure.identity.aio import DefaultAzureCredential
-from azure.appconfiguration.aio import AzureAppConfigurationClient
+from azure.appconfiguration.aio import FeatureFlagClient
 from azure.appconfiguration import (
     FeatureFlag,
     FeatureFlagConditions,
@@ -40,7 +40,7 @@ from azure.appconfiguration import (
 async def main():
     endpoint = os.environ["APPCONFIGURATION_ENDPOINT_STRING"]
     credential = DefaultAzureCredential()
-    client = AzureAppConfigurationClient(base_url=endpoint, credential=credential)
+    client = FeatureFlagClient(base_url=endpoint, credential=credential)
 
     print("Set a simple feature flag")
     # [START set_feature_flag_async]

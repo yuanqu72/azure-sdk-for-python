@@ -568,26 +568,26 @@ class PercentileAllocation:
     :ivar variant: The variant to allocate these percentiles to. Required.
     :vartype variant: str
     :ivar percentile_from: The lower bounds for this percentile allocation. Required.
-    :vartype percentile_from: int
+    :vartype percentile_from: float
     :ivar percentile_to: The upper bounds for this percentile allocation. Required.
-    :vartype percentile_to: int
+    :vartype percentile_to: float
     """
 
     variant: str
     """The variant to allocate these percentiles to. Required."""
-    percentile_from: int
+    percentile_from: float
     """The lower bounds for this percentile allocation. Required."""
-    percentile_to: int
+    percentile_to: float
     """The upper bounds for this percentile allocation. Required."""
 
-    def __init__(self, *, variant: str, percentile_from: int, percentile_to: int) -> None:
+    def __init__(self, *, variant: str, percentile_from: float, percentile_to: float) -> None:
         """
         :keyword variant: The variant to allocate these percentiles to. Required.
         :paramtype variant: str
         :keyword percentile_from: The lower bounds for this percentile allocation. Required.
-        :paramtype percentile_from: int
+        :paramtype percentile_from: float
         :keyword percentile_to: The upper bounds for this percentile allocation. Required.
-        :paramtype percentile_to: int
+        :paramtype percentile_to: float
         """
         self.variant = variant
         self.percentile_from = percentile_from

@@ -23,7 +23,7 @@ USAGE: python feature_flag_sample.py
 import os
 from azure.identity import DefaultAzureCredential
 from azure.appconfiguration import (
-    AzureAppConfigurationClient,
+    FeatureFlagClient,
     FeatureFlag,
     FeatureFlagConditions,
     FeatureFlagFilter,
@@ -39,7 +39,7 @@ from azure.appconfiguration import (
 def main():
     endpoint = os.environ["APPCONFIGURATION_ENDPOINT_STRING"]
     credential = DefaultAzureCredential()
-    client = AzureAppConfigurationClient(base_url=endpoint, credential=credential)
+    client = FeatureFlagClient(base_url=endpoint, credential=credential)
 
     print("Set a simple feature flag")
     # [START set_feature_flag]

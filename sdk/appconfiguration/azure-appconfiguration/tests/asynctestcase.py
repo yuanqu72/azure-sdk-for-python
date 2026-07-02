@@ -7,7 +7,7 @@
 import os
 from typing import List
 from testcase import AppConfigTestCase, _AUDIENCE_UNSET
-from azure.appconfiguration.aio import AzureAppConfigurationClient
+from azure.appconfiguration.aio import AzureAppConfigurationClient, FeatureFlagClient
 from azure.core.async_paging import AsyncItemPaged
 
 
@@ -18,6 +18,12 @@ class AsyncAppConfigTestCase(AppConfigTestCase):
         if audience is _AUDIENCE_UNSET:
             audience = os.environ.get("APPCONFIGURATION_AUDIENCE")
         return AzureAppConfigurationClient(appconfiguration_endpoint_string, cred, audience=audience)
+
+    def create_feature_flag_client(self, appconfiguration_endpoint_string, audience=_AUDIENCE_UNSET):
+        cred = self.get_credential(FeatureFlagClient, is_async=True)
+        if audience is _AUDIENCE_UNSET:
+            audience = os.environ.get("APPCONFIGURATION_AUDIENCE")
+        return FeatureFlagClient(appconfiguration_endpoint_string, cred, audience=audience)
 
     async def convert_to_list(self, items: AsyncItemPaged) -> List:
         list = []

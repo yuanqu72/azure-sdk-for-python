@@ -1299,8 +1299,9 @@ class TestAppConfigurationClientAAD(AppConfigTestCase):  # pylint: disable=too-m
         # verify resource_type segregates key-value labels ('kv') from feature-flag
         # labels ('ff').
         ff_label = "ff_resource_type_" + LABEL
+        ff_client = self.create_feature_flag_client(appconfiguration_endpoint_string)
         feature_flag = FeatureFlag(name="resource_type_feature", enabled=True, label=ff_label)
-        self.client.set_feature_flag(feature_flag)
+        ff_client.set_feature_flag(feature_flag)
         try:
             # resource_type="kv" returns labels used by key-value settings only.
             kv_labels = {item.name for item in self.client.list_labels(resource_type="kv")}
@@ -1312,7 +1313,7 @@ class TestAppConfigurationClientAAD(AppConfigTestCase):  # pylint: disable=too-m
             assert ff_label in ff_labels
             assert LABEL not in ff_labels
         finally:
-            self.client.delete_feature_flag("resource_type_feature", label=ff_label)
+            ff_client.delete_feature_flag("resource_type_feature", label=ff_label)
             self.tear_down()
 
 

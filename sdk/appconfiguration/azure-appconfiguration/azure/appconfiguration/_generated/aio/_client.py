@@ -17,7 +17,7 @@ from azure.core.rest import AsyncHttpResponse, HttpRequest
 
 from .._utils.serialization import Deserializer, Serializer
 from ._configuration import AzureAppConfigurationClientConfiguration
-from ._operations import _AzureAppConfigurationClientOperationsMixin
+from .operations import FeatureFlagClientOperations, _AzureAppConfigurationClientOperationsMixin
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -31,6 +31,8 @@ if TYPE_CHECKING:
 class AzureAppConfigurationClient(_AzureAppConfigurationClientOperationsMixin):
     """Azure App Configuration REST API.
 
+    :ivar feature_flag_client: FeatureFlagClientOperations operations
+    :vartype feature_flag_client: azure.appconfiguration.aio.operations.FeatureFlagClientOperations
     :param endpoint: Required.
     :type endpoint: str
     :param credential: Credential used to authenticate requests to the service. Is either a key
@@ -74,6 +76,9 @@ class AzureAppConfigurationClient(_AzureAppConfigurationClientOperationsMixin):
         self._serialize = Serializer()
         self._deserialize = Deserializer()
         self._serialize.client_side_validation = False
+        self.feature_flag_client = FeatureFlagClientOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
 
     def send_request(
         self, request: HttpRequest, *, stream: bool = False, **kwargs: Any

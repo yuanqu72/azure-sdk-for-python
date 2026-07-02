@@ -34,6 +34,9 @@ AppConfigPreparer = functools.partial(
 class TestFeatureFlagEndpoint(AppConfigTestCase):
     """Tests for the new dedicated feature flag endpoint methods"""
 
+    def create_client(self, *args, **kwargs):
+        return self.create_feature_flag_client(*args, **kwargs)
+
     @AppConfigPreparer()
     @recorded_by_proxy
     def test_list_feature_flags(self, appconfiguration_endpoint_string):
@@ -385,3 +388,25 @@ class TestFeatureFlagEndpoint(AppConfigTestCase):
         assert retrieved.last_modified is not None
 
         client.delete_feature_flag("test_feature_full", label="prod")
+
+    @AppConfigPreparer()
+    @recorded_by_proxy
+    def test_list_labels(self, appconfiguration_endpoint_string):
+        """Test listing feature flag labels using the dedicated feature flag endpoint."""
+        set_custom_default_matcher(compare_bodies=False, excluded_headers="x-ms-content-sha256,x-ms-date")
+        client = self.create_client(appconfiguration_endpoint_string)
+
+        ff_label = "test_ff_label"
+        feature_flag = FeatureFlag(name="test_feature_labels", enabled=True, label=ff_label)
+        client.set_feature_flag(feature_flag)
+        try:
+            # resource_type="ff" returns labels used by feature flags.
+            ff_labels = {item.name for item in client.list_labels(resource_type="ff")}
+            assert ff_label in ff_labels
+
+            # name filter narrows the results to the matching label.
+            filtered = list(client.list_labels(name=ff_label, resource_type="ff"))
+            assert len(filtered) == 1
+            assert filtered[0].name == ff_label
+        finally:
+            client.delete_feature_flag("test_feature_labels", label=ff_label)
