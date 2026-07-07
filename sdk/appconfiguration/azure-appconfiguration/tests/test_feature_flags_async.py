@@ -71,23 +71,23 @@ class TestFeatureFlagEndpointAsync(AsyncAppConfigTestCase):
         client = self.create_client(appconfiguration_endpoint_string)
 
         # Create feature flags
-        feature_flag1 = FeatureFlag(name="myfeature_alpha", enabled=True)
-        feature_flag2 = FeatureFlag(name="myfeature_beta", enabled=False)
-        feature_flag3 = FeatureFlag(name="otherfeature", enabled=True)
+        feature_flag1 = FeatureFlag(name="my_feature_alpha", enabled=True)
+        feature_flag2 = FeatureFlag(name="my_feature_beta", enabled=False)
+        feature_flag3 = FeatureFlag(name="other_feature", enabled=True)
 
         await client.set_feature_flag(feature_flag1)
         await client.set_feature_flag(feature_flag2)
         await client.set_feature_flag(feature_flag3)
 
         # List with name filter
-        flags = [f async for f in client.list_feature_flags(name_filter="myfeature*")]
+        flags = [f async for f in client.list_feature_flags(name_filter="my_feature*")]
         assert len(flags) >= 2
-        assert all("myfeature" in f.name for f in flags)
+        assert all("my_feature" in f.name for f in flags)
 
         # Clean up
-        await client.delete_feature_flag("myfeature_alpha", label=feature_flag1.label)
-        await client.delete_feature_flag("myfeature_beta", label=feature_flag2.label)
-        await client.delete_feature_flag("otherfeature", label=feature_flag3.label)
+        await client.delete_feature_flag("my_feature_alpha", label=feature_flag1.label)
+        await client.delete_feature_flag("my_feature_beta", label=feature_flag2.label)
+        await client.delete_feature_flag("other_feature", label=feature_flag3.label)
         await client.close()
 
     @AppConfigPreparer()
@@ -374,7 +374,7 @@ class TestFeatureFlagEndpointAsync(AsyncAppConfigTestCase):
                 user=[UserAllocation(variant="Large", users=["carol"])],
                 group=[GroupAllocation(variant="Small", groups=["internal"])],
             ),
-            telemetry=FeatureFlagTelemetryConfiguration(enabled=True, metadata={"source": "test"}),
+            telemetry=FeatureFlagTelemetryConfiguration(enabled=True, metadata={"origin": "test"}),
             tags={"env": "prod", "critical": "true"},
         )
         created = await client.set_feature_flag(feature_flag)
@@ -395,7 +395,7 @@ class TestFeatureFlagEndpointAsync(AsyncAppConfigTestCase):
         assert retrieved.allocation is not None
         assert retrieved.allocation.default_when_enabled == "Large"
         assert retrieved.telemetry is not None
-        assert retrieved.telemetry.metadata == {"source": "test"}
+        assert retrieved.telemetry.metadata == {"origin": "test"}
         assert retrieved.tags == {"env": "prod", "critical": "true"}
         assert retrieved.etag is not None
         assert retrieved.last_modified is not None
