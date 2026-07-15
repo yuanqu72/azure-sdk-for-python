@@ -1296,20 +1296,21 @@ class TestAppConfigurationClientAAD(AppConfigTestCase):  # pylint: disable=too-m
         self.set_up(appconfiguration_endpoint_string)
         # set_up creates key-value settings labeled LABEL. Add a dedicated feature flag
         # (written through the feature-flag endpoint) with a distinct label so we can
-        # verify resource_type segregates key-value labels ('kv') from feature-flag
-        # labels ('ff').
+        # verify each client only returns labels for its own resource type: the
+        # configuration client always lists key-value labels ('kv') and the feature
+        # flag client always lists feature-flag labels ('ff').
         ff_label = "ff_resource_type_" + LABEL
         ff_client = self.create_feature_flag_client(appconfiguration_endpoint_string)
         feature_flag = FeatureFlag(name="resource_type_feature", enabled=True, label=ff_label)
         ff_client.set_feature_flag(feature_flag)
         try:
-            # resource_type="kv" returns labels used by key-value settings only.
-            kv_labels = {item.name for item in self.client.list_labels(resource_type="kv")}
+            # The configuration client only lists key-value labels.
+            kv_labels = {item.name for item in self.client.list_labels()}
             assert LABEL in kv_labels
             assert ff_label not in kv_labels
 
-            # resource_type="ff" returns labels used by feature flags only.
-            ff_labels = {item.name for item in self.client.list_labels(resource_type="ff")}
+            # The feature flag client only lists feature-flag labels.
+            ff_labels = {item.name for item in ff_client.list_labels()}
             assert ff_label in ff_labels
             assert LABEL not in ff_labels
         finally:

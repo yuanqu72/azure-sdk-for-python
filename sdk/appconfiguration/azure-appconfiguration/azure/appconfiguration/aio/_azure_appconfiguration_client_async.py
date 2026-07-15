@@ -1,4 +1,4 @@
-# pylint: disable=line-too-long,useless-suppression,too-many-lines
+# pylint: disable=line-too-long,useless-suppression
 # ------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for
@@ -47,7 +47,7 @@ from .._utils import (
 from .._audience_error_handling_policy import AudienceErrorHandlingPolicy
 
 
-class AzureAppConfigurationClient:  # pylint: disable=too-many-public-methods
+class AzureAppConfigurationClient:
     """Represents a client that calls restful API of Azure App Configuration service.
 
     :param str base_url: Base url of the service.
@@ -651,7 +651,6 @@ class AzureAppConfigurationClient:  # pylint: disable=too-many-public-methods
         after: Optional[str] = None,
         accept_datetime: Optional[Union[datetime, str]] = None,
         fields: Optional[List[Union[str, LabelFields]]] = None,
-        resource_type: Optional[str] = None,
         **kwargs: Any,
     ) -> AsyncItemPaged[ConfigurationSettingLabel]:
         """Gets a list of labels.
@@ -669,9 +668,6 @@ class AzureAppConfigurationClient:  # pylint: disable=too-many-public-methods
         :keyword fields: Specify which fields to include in the results. If not specified, will include all fields.
             Available fields see :class:`~azure.appconfiguration.LabelFields`.
         :paramtype fields: list[str] or list[~azure.appconfiguration.LabelFields] or None
-        :keyword resource_type: A filter used to indicate the resource type of the labels. Accepted values:
-            'kv' for key-value labels, 'ff' for feature flag labels. Default is `None`.
-        :paramtype resource_type: str or None
         :return: An async iterator of labels.
         :rtype: ~azure.core.async_paging.AsyncItemPaged[~azure.appconfiguration.ConfigurationSettingLabel]
         :raises: :class:`~azure.core.exceptions.HttpResponseError`
@@ -683,7 +679,7 @@ class AzureAppConfigurationClient:  # pylint: disable=too-many-public-methods
             after=after,
             accept_datetime=accept_datetime,
             select=fields,
-            resource_type=resource_type,
+            resource_type="kv",
             cls=lambda objs: [ConfigurationSettingLabel(name=x.name) for x in objs],
             **kwargs,
         )

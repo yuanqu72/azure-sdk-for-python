@@ -400,12 +400,12 @@ class TestFeatureFlagEndpoint(AppConfigTestCase):
         feature_flag = FeatureFlag(name="test_feature_labels", enabled=True, label=ff_label)
         client.set_feature_flag(feature_flag)
         try:
-            # resource_type="ff" returns labels used by feature flags.
-            ff_labels = {item.name for item in client.list_labels(resource_type="ff")}
+            # The feature flag endpoint only lists feature-flag labels.
+            ff_labels = {item.name for item in client.list_labels()}
             assert ff_label in ff_labels
 
             # name filter narrows the results to the matching label.
-            filtered = list(client.list_labels(name=ff_label, resource_type="ff"))
+            filtered = list(client.list_labels(name=ff_label))
             assert len(filtered) == 1
             assert filtered[0].name == ff_label
         finally:

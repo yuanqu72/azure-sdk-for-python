@@ -71,7 +71,7 @@ class FeatureFlag(_Model):
 
     :ivar name: The name of the feature flag. Required.
     :vartype name: str
-    :ivar enabled: The enabled state of the feature flag.
+    :ivar enabled: The enabled state of the feature flag. Required.
     :vartype enabled: bool
     :ivar label: The label the feature flag belongs to.
     :vartype label: str
@@ -95,8 +95,8 @@ class FeatureFlag(_Model):
 
     name: str = rest_field(visibility=["read"])
     """The name of the feature flag. Required."""
-    enabled: Optional[bool] = rest_field(visibility=["read", "create", "update", "delete", "query"])
-    """The enabled state of the feature flag."""
+    enabled: bool = rest_field(visibility=["read", "create", "update", "delete", "query"])
+    """The enabled state of the feature flag. Required."""
     label: Optional[str] = rest_field(visibility=["read"])
     """The label the feature flag belongs to."""
     description: Optional[str] = rest_field(visibility=["read", "create", "update", "delete", "query"])
@@ -128,7 +128,7 @@ class FeatureFlag(_Model):
     def __init__(
         self,
         *,
-        enabled: Optional[bool] = None,
+        enabled: bool,
         description: Optional[str] = None,
         conditions: Optional["_models.FeatureFlagConditions"] = None,
         variants: Optional[list["_models.FeatureFlagVariantDefinition"]] = None,
@@ -428,7 +428,7 @@ class KeyValue(_Model):
 
     key: str = rest_field(visibility=["read"])
     """The key of the key-value. Required."""
-    label: Optional[str] = rest_field(visibility=["read"])
+    label: Optional[str] = rest_field(visibility=["read", "create", "update", "delete", "query"])
     """The label the key-value belongs to."""
     content_type: Optional[str] = rest_field(visibility=["read", "create", "update", "delete", "query"])
     """The content type of the value stored within the key-value."""
@@ -451,6 +451,7 @@ class KeyValue(_Model):
     def __init__(
         self,
         *,
+        label: Optional[str] = None,
         content_type: Optional[str] = None,
         value: Optional[str] = None,
         last_modified: Optional[datetime.datetime] = None,
@@ -512,7 +513,7 @@ class KeyValueFilter(_Model):
 
 
 class Label(_Model):
-    """Labels are used to group key values or feature flags.
+    """Labels are used to group key-values.
 
     :ivar name: The name of the label.
     :vartype name: str

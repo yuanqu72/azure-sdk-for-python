@@ -8,12 +8,15 @@
   - Exposes `set_feature_flag()`, `get_feature_flag()`, `list_feature_flags()`, `delete_feature_flag()`, `add_feature_flag()`, `list_feature_flag_revisions()`, and `list_labels()`.
   - `FeatureFlagClient` is available from `azure.appconfiguration` (sync) and `azure.appconfiguration.aio` (async).
   - Added the `FeatureFlag` model along with `FeatureFlagConditions`, `FeatureFlagFilter`, `FeatureFlagVariantDefinition`, `FeatureFlagAllocation`, `FeatureFlagTelemetryConfiguration`, `PercentileAllocation`, `UserAllocation`, and `GroupAllocation`.
+  - `FeatureFlagClient.list_labels()` always lists feature-flag labels, while `AzureAppConfigurationClient.list_labels()` always lists key-value labels.
 
 ### Breaking Changes
 
 ### Bugs Fixed
 
 ### Other Changes
+
+- Updated the default service API version to `2026-05-01-preview`.
 
 ## 1.9.0 (2026-06-18)
 

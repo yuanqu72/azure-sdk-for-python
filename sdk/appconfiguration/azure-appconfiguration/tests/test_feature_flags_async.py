@@ -414,13 +414,13 @@ class TestFeatureFlagEndpointAsync(AsyncAppConfigTestCase):
         feature_flag = FeatureFlag(name="test_feature_labels", enabled=True, label=ff_label)
         await client.set_feature_flag(feature_flag)
         try:
-            # resource_type="ff" returns labels used by feature flags.
-            labels = await self.convert_to_list(client.list_labels(resource_type="ff"))
+            # The feature flag endpoint only lists feature-flag labels.
+            labels = await self.convert_to_list(client.list_labels())
             ff_labels = {item.name for item in labels}
             assert ff_label in ff_labels
 
             # name filter narrows the results to the matching label.
-            filtered = await self.convert_to_list(client.list_labels(name=ff_label, resource_type="ff"))
+            filtered = await self.convert_to_list(client.list_labels(name=ff_label))
             assert len(filtered) == 1
             assert filtered[0].name == ff_label
         finally:
