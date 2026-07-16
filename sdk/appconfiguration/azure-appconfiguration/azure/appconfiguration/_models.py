@@ -807,7 +807,7 @@ class FeatureFlag(Model):  # pylint: disable=too-many-instance-attributes
 
     name: str
     """The name of the feature flag."""
-    enabled: Optional[bool]
+    enabled: bool
     """The enabled state of the feature flag."""
     label: Optional[str]
     """The label the feature flag belongs to."""
