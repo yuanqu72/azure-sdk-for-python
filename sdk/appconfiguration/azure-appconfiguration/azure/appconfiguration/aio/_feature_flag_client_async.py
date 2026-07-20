@@ -210,6 +210,12 @@ class FeatureFlagClient:
         :return: The FeatureFlag if found; None otherwise.
         :rtype: ~azure.appconfiguration.FeatureFlag or None
         :raises: :class:`~azure.core.exceptions.HttpResponseError`
+
+        Example
+
+        .. code-block:: python
+
+            feature_flag = await async_client.get_feature_flag(feature_id="MyFeatureFlag")
         """
         if isinstance(accept_datetime, datetime):
             accept_datetime = str(accept_datetime)

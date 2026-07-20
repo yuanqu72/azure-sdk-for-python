@@ -423,6 +423,27 @@ class TestFeatureFlagEndpointAsync(AsyncAppConfigTestCase):
             filtered = await self.convert_to_list(client.list_labels(name=ff_label))
             assert len(filtered) == 1
             assert filtered[0].name == ff_label
+
+            # Negative case: a name filter that matches no label returns no results.
+            no_match = await self.convert_to_list(client.list_labels(name="nonexistent_ff_label"))
+            assert no_match == []
         finally:
             await client.delete_feature_flag("test_feature_labels", label=ff_label)
+            await client.close()
+
+    @AppConfigPreparer()
+    @recorded_by_proxy_async
+    async def test_get_feature_flag_wrong_label(self, appconfiguration_endpoint_string):
+        """Negative test: getting a feature flag with a label it doesn't have returns None."""
+        set_custom_default_matcher(compare_bodies=False, excluded_headers="x-ms-content-sha256,x-ms-date")
+        client = self.create_client(appconfiguration_endpoint_string)
+
+        feature_flag = FeatureFlag(name="test_feature_wrong_label", enabled=True, label="real_label")
+        await client.set_feature_flag(feature_flag)
+        try:
+            # The flag exists, but not under this label.
+            result = await client.get_feature_flag("test_feature_wrong_label", label="wrong_label")
+            assert result is None
+        finally:
+            await client.delete_feature_flag("test_feature_wrong_label", label="real_label")
             await client.close()
