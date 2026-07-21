@@ -447,3 +447,56 @@ class TestFeatureFlagEndpointAsync(AsyncAppConfigTestCase):
         finally:
             await client.delete_feature_flag("test_feature_wrong_label", label="real_label")
             await client.close()
+
+    @AppConfigPreparer()
+    @recorded_by_proxy_async
+    async def test_monitor_feature_flags_by_page_etag(self, appconfiguration_endpoint_string):
+        """Test etag-based change detection across feature flag pages via by_page(match_conditions=...)."""
+        set_custom_default_matcher(compare_bodies=False, excluded_headers="x-ms-content-sha256,x-ms-date")
+        client = self.create_client(appconfiguration_endpoint_string)
+
+        # prepare 200 feature flags -> multiple pages (100 feature flags per page)
+        for i in range(200):
+            await client.set_feature_flag(
+                FeatureFlag(name=f"monitor_ff_{str(i)}", enabled=True, label=f"monitor_label_{str(i)}")
+            )
+
+        # collect current page etags
+        match_conditions = []
+        items = client.list_feature_flags(name_filter="monitor_ff_*", label_filter="monitor_label_*")
+        iterator = items.by_page()
+        async for _ in iterator:
+            match_conditions.append(iterator.etag)
+        assert len(match_conditions) >= 2
+
+        # monitor without changes - unchanged pages are skipped (HTTP 304), so no pages are yielded
+        items = client.list_feature_flags(name_filter="monitor_ff_*", label_filter="monitor_label_*")
+        changed_pages = [page async for page in items.by_page(match_conditions=match_conditions)]
+        assert len(changed_pages) == 0
+
+        # modify a feature flag that lives on the first page
+        await client.set_feature_flag(FeatureFlag(name="monitor_ff_0", enabled=False, label="monitor_label_0"))
+
+        # monitor with the old etags - only the changed page is yielded
+        items = client.list_feature_flags(name_filter="monitor_ff_*", label_filter="monitor_label_*")
+        changed_pages = [page async for page in items.by_page(match_conditions=match_conditions)]
+        assert len(changed_pages) >= 1
+
+        # collect fresh etags; the first page etag changed while the page count is unchanged
+        new_match_conditions = []
+        items = client.list_feature_flags(name_filter="monitor_ff_*", label_filter="monitor_label_*")
+        iterator = items.by_page()
+        async for _ in iterator:
+            new_match_conditions.append(iterator.etag)
+        assert new_match_conditions[0] != match_conditions[0]
+        assert len(new_match_conditions) == len(match_conditions)
+
+        # monitoring with the fresh etags yields no changed pages
+        items = client.list_feature_flags(name_filter="monitor_ff_*", label_filter="monitor_label_*")
+        remaining = [page async for page in items.by_page(match_conditions=new_match_conditions)]
+        assert len(remaining) == 0
+
+        # clean up
+        for i in range(200):
+            await client.delete_feature_flag(f"monitor_ff_{str(i)}", label=f"monitor_label_{str(i)}")
+        await client.close()
