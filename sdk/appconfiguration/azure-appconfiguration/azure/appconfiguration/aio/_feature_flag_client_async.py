@@ -5,6 +5,7 @@
 # license information.
 # -------------------------------------------------------------------------
 from datetime import datetime
+import functools
 from typing import Any, Dict, List, Optional, Union
 from azure.core import MatchConditions
 from azure.core.async_paging import AsyncItemPaged
@@ -21,7 +22,12 @@ from .._azure_appconfiguration_requests import AppConfigRequestsCredentialsPolic
 from .._query_param_policy import QueryParamPolicy
 from .._generated.aio import AzureAppConfigurationClient as AzureAppConfigurationClientGenerated
 from .._generated.models import LabelFields
-from .._models import FeatureFlag, ConfigurationSettingLabel
+from .._models import (
+    FeatureFlag,
+    ConfigurationSettingLabel,
+    AsyncFeatureFlagPaged,
+    FeatureFlagPropertiesPagedAsync,
+)
 from .._audience import get_audience, DEFAULT_SCOPE_SUFFIX
 from .._utils import parse_connection_string
 from .._audience_error_handling_policy import AudienceErrorHandlingPolicy
@@ -150,7 +156,7 @@ class FeatureFlagClient:
         tags_filter: Optional[List[str]] = None,
         accept_datetime: Optional[Union[datetime, str]] = None,
         **kwargs: Any,
-    ) -> AsyncItemPaged["FeatureFlag"]:
+    ) -> AsyncFeatureFlagPaged:
         """
         Find the FeatureFlag objects, optionally filtered by name, label, tags and accept_datetime.
 
@@ -164,23 +170,39 @@ class FeatureFlagClient:
         :keyword accept_datetime: Retrieve FeatureFlag that existed at this datetime
         :paramtype accept_datetime: ~datetime.datetime or str or None
         :return: An async iterator of :class:`~azure.appconfiguration.FeatureFlag`
-        :rtype: ~azure.core.paging.AsyncItemPaged[~azure.appconfiguration.FeatureFlag]
+        :rtype: ~azure.appconfiguration.AsyncFeatureFlagPaged
         :raises: :class:`~azure.core.exceptions.HttpResponseError`
+
+        Example
+
+        .. code-block:: python
+
+            # List feature flags
+            feature_flags = async_client.list_feature_flags()
+            async for flag in feature_flags:
+                print(flag.name, flag.enabled)
+
+            # Detect changes across pages using etags
+            feature_flags = async_client.list_feature_flags(name_filter="sample_*")
+            match_conditions = [page.etag async for page in feature_flags.by_page()]
+
+            feature_flags = async_client.list_feature_flags(name_filter="sample_*")
+            async for page in feature_flags.by_page(match_conditions=match_conditions):
+                # Only pages that changed are returned
+                async for flag in page:
+                    print(flag.name, flag.enabled)
         """
         if isinstance(accept_datetime, datetime):
             accept_datetime = str(accept_datetime)
 
-        # Call the generated method and wrap results to convert to SDK FeatureFlag
-        def convert_to_sdk(objs):
-            return [FeatureFlag._from_generated(obj) for obj in objs]  # pylint:disable=protected-access
-
-        return self._impl.feature_flag_client.get_feature_flags(  # type: ignore[return-value]
+        command = functools.partial(self._impl.get_feature_flags_in_one_page, **kwargs)  # type: ignore[attr-defined]  # pylint: disable=no-member
+        return AsyncFeatureFlagPaged(
+            command,
             name=name_filter,
             label=label_filter,
             accept_datetime=accept_datetime,
             tags=tags_filter,
-            cls=convert_to_sdk,
-            **kwargs,
+            page_iterator_class=FeatureFlagPropertiesPagedAsync,
         )
 
     @distributed_trace_async
