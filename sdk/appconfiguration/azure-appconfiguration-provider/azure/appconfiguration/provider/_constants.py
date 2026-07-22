@@ -15,6 +15,15 @@ FEATURE_FLAG_REFERENCE_KEY = "FeatureFlagReference"
 ALLOCATION_ID_KEY = "AllocationId"
 ETAG_KEY = "ETag"
 
+# Identifier field used by feature flags loaded from the classic key-value store.
+FEATURE_FLAG_ID_FIELD = "id"
+# Identifier field used by feature flags loaded from the dedicated feature flag resource endpoint.
+FEATURE_FLAG_NAME_FIELD = "name"
+# Path segment used to build the feature flag reference URL for feature flags loaded from the key-value store.
+FEATURE_FLAG_KV_REFERENCE_SEGMENT = "kv"
+# Path segment used to build the feature flag reference URL for feature flags loaded from the resource endpoint.
+FEATURE_FLAG_RESOURCE_REFERENCE_SEGMENT = "ff"
+
 # ------------------------------------------------------------------------
 # Environment Variable Constants
 # ------------------------------------------------------------------------

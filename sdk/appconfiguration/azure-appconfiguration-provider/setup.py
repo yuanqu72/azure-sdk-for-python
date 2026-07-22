@@ -73,7 +73,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "azure-core>=1.31.0",
-        "azure-appconfiguration>=1.8.0",
+        "azure-appconfiguration>=1.10.0b1",
         "azure-keyvault-secrets>=4.3.0",
         "dnspython>=2.6.1",
     ],

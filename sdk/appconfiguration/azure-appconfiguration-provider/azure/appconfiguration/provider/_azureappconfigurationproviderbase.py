@@ -25,6 +25,7 @@ from typing import (
 from azure.appconfiguration import (  # type:ignore # pylint:disable=no-name-in-module
     ConfigurationSetting,
     FeatureFlagConfigurationSetting,
+    FeatureFlag,
 )
 from ._models import SettingSelector
 from ._constants import (
@@ -38,6 +39,10 @@ from ._constants import (
     APP_CONFIG_AICC_MIME_PROFILE,
     FEATURE_MANAGEMENT_KEY,
     FEATURE_FLAG_KEY,
+    FEATURE_FLAG_ID_FIELD,
+    FEATURE_FLAG_NAME_FIELD,
+    FEATURE_FLAG_KV_REFERENCE_SEGMENT,
+    FEATURE_FLAG_RESOURCE_REFERENCE_SEGMENT,
 )
 from ._refresh_timer import _RefreshTimer
 from ._request_tracing_context import _RequestTracingContext
@@ -115,6 +120,16 @@ class AzureAppConfigurationProviderBase(Mapping[str, Union[str, JSON]]):  # pyli
         self._refresh_enabled = refresh_enabled
         self._page_etags: List[List[str]] = []
         self._feature_flag_page_etags: List[List[str]] = []
+        # Per-selector collection ETags for feature flags loaded from the feature flag resource endpoint. This is
+        # independent of the key-value based feature_flag_page_etags, since the resource endpoint is a separate
+        # resource type with its own change-detection mechanism.
+        self._feature_flag_resource_etags: List[List[str]] = []
+        # Feature flags are loaded from two independent sources: the classic key-value store, and the newer
+        # dedicated feature flag resource endpoint. Each source's processed output is cached separately so that a
+        # refresh of one source does not require re-processing or discarding the other source's data. The two are
+        # merged (resource-based feature flags take precedence on identifier collision) whenever either changes.
+        self._processed_kv_feature_flags: List[Dict[str, Any]] = []
+        self._processed_resource_feature_flags: List[Dict[str, Any]] = []
         self._tracing_context = _RequestTracingContext(kwargs.pop("load_balancing_enabled", False))
         self._update_lock = Lock()
         self._refresh_lock = Lock()
@@ -132,7 +147,7 @@ class AzureAppConfigurationProviderBase(Mapping[str, Union[str, JSON]]):  # pyli
         self, endpoint: str, feature_flag: FeatureFlagConfigurationSetting, feature_flag_value: Dict
     ):
         """
-        Add telemetry metadata to feature flag values.
+        Add telemetry metadata to feature flag values loaded from the classic key-value store.
 
         :param endpoint: The App Configuration endpoint URL.
         :type endpoint: str
@@ -141,6 +156,61 @@ class AzureAppConfigurationProviderBase(Mapping[str, Union[str, JSON]]):  # pyli
         :param feature_flag_value: The feature flag value dictionary to update.
         :type feature_flag_value: Dict[str, Any]
         """
+        self._update_ff_telemetry_metadata_common(
+            endpoint,
+            feature_flag.key,
+            feature_flag.label,
+            feature_flag.etag,
+            feature_flag_value,
+            FEATURE_FLAG_KV_REFERENCE_SEGMENT,
+        )
+
+    def _update_ff_resource_telemetry_metadata(self, endpoint: str, feature_flag: FeatureFlag, feature_flag_value: Dict):
+        """
+        Add telemetry metadata to feature flag values loaded from the feature flag resource endpoint.
+
+        :param endpoint: The App Configuration endpoint URL.
+        :type endpoint: str
+        :param feature_flag: The feature flag resource.
+        :type feature_flag: ~azure.appconfiguration.FeatureFlag
+        :param feature_flag_value: The feature flag value dictionary to update.
+        :type feature_flag_value: Dict[str, Any]
+        """
+        self._update_ff_telemetry_metadata_common(
+            endpoint,
+            feature_flag.name,
+            feature_flag.label,
+            feature_flag.etag,
+            feature_flag_value,
+            FEATURE_FLAG_RESOURCE_REFERENCE_SEGMENT,
+        )
+
+    def _update_ff_telemetry_metadata_common(  # pylint: disable=too-many-positional-arguments
+        self,
+        endpoint: str,
+        identifier: str,
+        label: Optional[str],
+        etag: Optional[str],
+        feature_flag_value: Dict,
+        reference_path_segment: str,
+    ):
+        """
+        Add telemetry metadata to a feature flag value dictionary, regardless of which endpoint it was loaded from.
+
+        :param endpoint: The App Configuration endpoint URL.
+        :type endpoint: str
+        :param identifier: The identifier of the feature flag (key for key-value based, name for resource-based).
+        :type identifier: str
+        :param label: The label of the feature flag.
+        :type label: Optional[str]
+        :param etag: The etag of the feature flag.
+        :type etag: Optional[str]
+        :param feature_flag_value: The feature flag value dictionary to update.
+        :type feature_flag_value: Dict[str, Any]
+        :param reference_path_segment: The path segment to use when building the feature flag reference URL, e.g.
+            "kv" for key-value based feature flags or "ff" for resource-based feature flags.
+        :type reference_path_segment: str
+        """
         if TELEMETRY_KEY not in feature_flag_value:
             # Initialize telemetry dictionary if not present
             feature_flag_value[TELEMETRY_KEY] = {}
@@ -148,15 +218,15 @@ class AzureAppConfigurationProviderBase(Mapping[str, Union[str, JSON]]):  # pyli
         # Update telemetry metadata for application insights/logging in feature management
         if METADATA_KEY not in feature_flag_value[TELEMETRY_KEY]:
             feature_flag_value[TELEMETRY_KEY][METADATA_KEY] = {}
-        feature_flag_value[TELEMETRY_KEY][METADATA_KEY][ETAG_KEY] = feature_flag.etag
+        feature_flag_value[TELEMETRY_KEY][METADATA_KEY][ETAG_KEY] = etag
 
         if feature_flag_value[TELEMETRY_KEY].get("enabled"):
             self._tracing_context.uses_telemetry = True
             if not endpoint.endswith("/"):
                 endpoint += "/"
-            feature_flag_reference = f"{endpoint}kv/{feature_flag.key}"
-            if feature_flag.label and not feature_flag.label.isspace():
-                feature_flag_reference += f"?label={feature_flag.label}"
+            feature_flag_reference = f"{endpoint}{reference_path_segment}/{identifier}"
+            if label and not label.isspace():
+                feature_flag_reference += f"?label={label}"
 
             feature_flag_value[TELEMETRY_KEY][METADATA_KEY][FEATURE_FLAG_REFERENCE_KEY] = feature_flag_reference
             allocation_id = self._generate_allocation_id(feature_flag_value)
@@ -240,10 +310,14 @@ class AzureAppConfigurationProviderBase(Mapping[str, Union[str, JSON]]):  # pyli
 
                 for v in sorted_variants:
                     allocation_id += f"{base64.b64encode(v.get('name', '').encode()).decode()},"
+                    # Key-value based feature flags store the variant value under "configuration_value". Feature
+                    # flags loaded from the feature flag resource endpoint store it under "value" instead.
                     if "configuration_value" in v:
                         allocation_id += (
                             f"{json.dumps(v.get('configuration_value', ''), separators=(',', ':'), sort_keys=True)}"
                         )
+                    elif "value" in v:
+                        allocation_id += f"{json.dumps(v.get('value', ''), separators=(',', ':'), sort_keys=True)}"
                     allocation_id += ";"
                 if sorted_variants:
                     allocation_id = allocation_id[:-1]
@@ -369,16 +443,55 @@ class AzureAppConfigurationProviderBase(Mapping[str, Union[str, JSON]]):  # pyli
         processed_settings: Dict[str, Any],
         processed_feature_flags: List[Dict[str, Any]],
         feature_flags: Optional[List[FeatureFlagConfigurationSetting]],
+        feature_flag_resources: Optional[List[FeatureFlag]] = None,
     ) -> Dict[str, Any]:
-        if feature_flags:
+        if feature_flags or feature_flag_resources:
             # Reset feature flag usage
             self._tracing_context.reset_feature_filter_usage()
-            processed_feature_flags = [self._process_feature_flag(ff) for ff in feature_flags]
+
+        if feature_flags:
+            self._processed_kv_feature_flags = [self._process_feature_flag(ff) for ff in feature_flags]
+
+        if feature_flag_resources:
+            self._processed_resource_feature_flags = [
+                self._process_feature_flag_resource(ff) for ff in feature_flag_resources
+            ]
+
+        if feature_flags or feature_flag_resources:
+            processed_feature_flags = self._merge_feature_flags(
+                self._processed_kv_feature_flags, self._processed_resource_feature_flags
+            )
 
         if self._feature_flag_enabled:
             processed_settings[FEATURE_MANAGEMENT_KEY] = {}
             processed_settings[FEATURE_MANAGEMENT_KEY][FEATURE_FLAG_KEY] = processed_feature_flags
         return processed_settings
+
+    @staticmethod
+    def _merge_feature_flags(
+        kv_feature_flags: List[Dict[str, Any]], resource_feature_flags: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Merge feature flags loaded from the classic key-value store with feature flags loaded from the feature
+        flag resource endpoint. Feature flags are matched by their identifier (``id`` for key-value based feature
+        flags, ``name`` for resource-based feature flags). When both sources contain a feature flag with the same
+        identifier, the resource-based feature flag takes precedence.
+
+        :param kv_feature_flags: The feature flags loaded from the classic key-value store.
+        :type kv_feature_flags: List[Dict[str, Any]]
+        :param resource_feature_flags: The feature flags loaded from the feature flag resource endpoint.
+        :type resource_feature_flags: List[Dict[str, Any]]
+        :return: The merged list of feature flags.
+        :rtype: List[Dict[str, Any]]
+        """
+        merged: Dict[str, Dict[str, Any]] = {}
+        for ff in kv_feature_flags:
+            identifier = ff.get(FEATURE_FLAG_ID_FIELD)
+            merged[identifier] = ff
+        for ff in resource_feature_flags:
+            identifier = ff.get(FEATURE_FLAG_NAME_FIELD)
+            merged[identifier] = ff
+        return list(merged.values())
 
     def _process_feature_flag(self, feature_flag: FeatureFlagConfigurationSetting) -> Dict[str, Any]:
         try:
@@ -389,6 +502,91 @@ class AzureAppConfigurationProviderBase(Mapping[str, Union[str, JSON]]):  # pyli
         except json.JSONDecodeError:
             # Feature flag value is not a valid JSON
             return {}
+
+    def _process_feature_flag_resource(self, feature_flag: FeatureFlag) -> Dict[str, Any]:
+        """
+        Convert a feature flag resource, loaded from the feature flag resource endpoint, into a dictionary using
+        the feature flag resource's native field names.
+
+        :param feature_flag: The feature flag resource.
+        :type feature_flag: ~azure.appconfiguration.FeatureFlag
+        :return: The feature flag as a dictionary.
+        :rtype: Dict[str, Any]
+        """
+        feature_flag_value: Dict[str, Any] = {
+            FEATURE_FLAG_NAME_FIELD: feature_flag.name,
+            "enabled": feature_flag.enabled,
+        }
+        if feature_flag.label and not feature_flag.label.isspace():
+            feature_flag_value["label"] = feature_flag.label
+        if feature_flag.description:
+            feature_flag_value["description"] = feature_flag.description
+
+        filter_names: List[Optional[str]] = []
+        if feature_flag.conditions:
+            conditions_value: Dict[str, Any] = {}
+            if feature_flag.conditions.requirement_type:
+                conditions_value["requirement_type"] = feature_flag.conditions.requirement_type
+            if feature_flag.conditions.client_filters:
+                conditions_value["client_filters"] = [
+                    {"name": client_filter.name, "parameters": client_filter.parameters}
+                    for client_filter in feature_flag.conditions.client_filters
+                ]
+                filter_names = [client_filter.name for client_filter in feature_flag.conditions.client_filters]
+            if conditions_value:
+                feature_flag_value["conditions"] = conditions_value
+
+        if feature_flag.variants:
+            feature_flag_value["variants"] = [
+                {
+                    "name": variant.name,
+                    "value": variant.value,
+                    "content_type": variant.content_type,
+                    "status_override": variant.status_override,
+                }
+                for variant in feature_flag.variants
+            ]
+
+        if feature_flag.allocation:
+            allocation_value: Dict[str, Any] = {}
+            if feature_flag.allocation.default_when_disabled:
+                allocation_value["default_when_disabled"] = feature_flag.allocation.default_when_disabled
+            if feature_flag.allocation.default_when_enabled:
+                allocation_value["default_when_enabled"] = feature_flag.allocation.default_when_enabled
+            if feature_flag.allocation.percentile:
+                allocation_value["percentile"] = [
+                    {
+                        "variant": percentile.variant,
+                        "percentile_from": percentile.percentile_from,
+                        "percentile_to": percentile.percentile_to,
+                    }
+                    for percentile in feature_flag.allocation.percentile
+                ]
+            if feature_flag.allocation.user:
+                allocation_value["user"] = [
+                    {"variant": user.variant, "users": user.users} for user in feature_flag.allocation.user
+                ]
+            if feature_flag.allocation.group:
+                allocation_value["group"] = [
+                    {"variant": group.variant, "groups": group.groups} for group in feature_flag.allocation.group
+                ]
+            if feature_flag.allocation.seed:
+                allocation_value["seed"] = feature_flag.allocation.seed
+            if allocation_value:
+                feature_flag_value["allocation"] = allocation_value
+
+        if feature_flag.telemetry:
+            feature_flag_value["telemetry"] = {
+                "enabled": feature_flag.telemetry.enabled,
+                "metadata": dict(feature_flag.telemetry.metadata) if feature_flag.telemetry.metadata else {},
+            }
+
+        if feature_flag.tags:
+            feature_flag_value["tags"] = dict(feature_flag.tags)
+
+        self._update_ff_resource_telemetry_metadata(self._origin_endpoint, feature_flag, feature_flag_value)
+        self._tracing_context.update_feature_filter_telemetry_by_names(filter_names)
+        return feature_flag_value
 
     def _update_watched_settings(
         self, configuration_settings: List[ConfigurationSetting]

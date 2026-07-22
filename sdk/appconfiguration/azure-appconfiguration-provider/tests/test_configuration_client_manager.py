@@ -27,6 +27,22 @@ class MockClient:
         self.retry_backoff = retry_backoff
 
 
+class _FakePagedIterator:
+    """Mimics an ItemPaged page iterator, exposing a mutable ``etag`` reflecting the last-yielded page."""
+
+    def __init__(self, pages):
+        self._pages = iter(pages)
+        self.etag = None
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        page, etag = next(self._pages)
+        self.etag = etag
+        return page
+
+
 @pytest.mark.usefixtures("caplog")
 class TestConfigurationClientManager(unittest.TestCase):
 
@@ -371,3 +387,163 @@ def test_check_page_etags_keys_first_then_snapshot():
     mock_client.list_configuration_settings.assert_called_once_with(
         key_filter="app/*", label_filter="\0", tags_filter=None
     )
+
+
+def test_load_feature_flag_resources_no_feature_flag_client():
+    """When no feature flag client is configured, no service calls are made."""
+    mock_client = Mock()
+    wrapper = _ConfigurationClientWrapper("https://fake.endpoint", mock_client)
+
+    selects = [SettingSelector(key_filter="app/*"), SettingSelector(key_filter="other/*")]
+
+    feature_flags, page_etags = wrapper.load_feature_flag_resources(selects)
+
+    assert feature_flags == []
+    assert page_etags == [[], []]
+
+
+def test_load_feature_flag_resources_skips_snapshot_selectors():
+    """Selectors with a snapshot_name are not supported by the feature flag resource endpoint and are skipped."""
+    mock_client = Mock()
+    mock_feature_flag_client = Mock()
+    wrapper = _ConfigurationClientWrapper("https://fake.endpoint", mock_client, mock_feature_flag_client)
+
+    selects = [
+        SettingSelector(snapshot_name="my-snapshot"),
+        SettingSelector(key_filter="app/*"),
+    ]
+
+    flag1 = Mock(name="flag1")
+    mock_response = Mock()
+    mock_response.by_page.return_value = _FakePagedIterator([([flag1], "etag1")])
+    mock_feature_flag_client.list_feature_flags.return_value = mock_response
+
+    feature_flags, page_etags = wrapper.load_feature_flag_resources(selects)
+
+    assert feature_flags == [flag1]
+    assert page_etags == [[], ["etag1"]]
+    # Only the non-snapshot selector should trigger a service call
+    mock_feature_flag_client.list_feature_flags.assert_called_once_with(
+        name_filter="app/*", label_filter="\0", tags_filter=None
+    )
+
+
+def test_load_feature_flag_resources_multiple_pages():
+    """Multiple pages should be aggregated and each page's etag collected."""
+    mock_client = Mock()
+    mock_feature_flag_client = Mock()
+    wrapper = _ConfigurationClientWrapper("https://fake.endpoint", mock_client, mock_feature_flag_client)
+
+    selects = [SettingSelector(key_filter="app/*")]
+
+    flag1 = Mock(name="flag1")
+    flag2 = Mock(name="flag2")
+
+    class FakeIterator:
+        """Mimics an ItemPaged iterator, exposing a mutable ``etag`` reflecting the last-yielded page."""
+
+        def __init__(self, pages):
+            self._pages = iter(pages)
+            self.etag = None
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            page, etag = next(self._pages)
+            self.etag = etag
+            return page
+
+    mock_response = Mock()
+    mock_response.by_page.return_value = FakeIterator([([flag1], "etag1"), ([flag2], "etag2")])
+    mock_feature_flag_client.list_feature_flags.return_value = mock_response
+
+    feature_flags, page_etags = wrapper.load_feature_flag_resources(selects)
+
+    assert feature_flags == [flag1, flag2]
+    assert page_etags == [["etag1", "etag2"]]
+
+
+def test_check_feature_flag_resource_etags_no_feature_flag_client():
+    """When no feature flag client is configured, no changes are reported."""
+    mock_client = Mock()
+    wrapper = _ConfigurationClientWrapper("https://fake.endpoint", mock_client)
+
+    selects = [SettingSelector(key_filter="app/*")]
+
+    result = wrapper.check_feature_flag_resource_etags(selects, [["etag1"]])
+
+    assert result is False
+
+
+def test_check_feature_flag_resource_etags_no_change():
+    """When the returned pages are empty, no changes are reported."""
+    mock_client = Mock()
+    mock_feature_flag_client = Mock()
+    wrapper = _ConfigurationClientWrapper("https://fake.endpoint", mock_client, mock_feature_flag_client)
+
+    selects = [SettingSelector(key_filter="app/*")]
+    page_etags = [["etag1"]]
+
+    mock_response = Mock()
+    mock_response.by_page.return_value = iter([])
+    mock_feature_flag_client.list_feature_flags.return_value = mock_response
+
+    result = wrapper.check_feature_flag_resource_etags(selects, page_etags)
+
+    assert result is False
+    mock_feature_flag_client.list_feature_flags.assert_called_once_with(
+        name_filter="app/*", label_filter="\0", tags_filter=None
+    )
+    mock_response.by_page.assert_called_once_with(match_conditions=["etag1"])
+
+
+def test_check_feature_flag_resource_etags_change_detected():
+    """When a page is returned, a change should be reported."""
+    mock_client = Mock()
+    mock_feature_flag_client = Mock()
+    wrapper = _ConfigurationClientWrapper("https://fake.endpoint", mock_client, mock_feature_flag_client)
+
+    selects = [SettingSelector(key_filter="app/*")]
+    page_etags = [["etag1"]]
+
+    mock_response = Mock()
+    mock_response.by_page.return_value = iter([[Mock()]])
+    mock_feature_flag_client.list_feature_flags.return_value = mock_response
+
+    result = wrapper.check_feature_flag_resource_etags(selects, page_etags)
+
+    assert result is True
+
+
+def test_check_feature_flag_resource_etags_skips_snapshot_selectors():
+    """Selectors with a snapshot_name are not supported and should be skipped without a service call."""
+    mock_client = Mock()
+    mock_feature_flag_client = Mock()
+    wrapper = _ConfigurationClientWrapper("https://fake.endpoint", mock_client, mock_feature_flag_client)
+
+    selects = [SettingSelector(snapshot_name="my-snapshot")]
+    page_etags = [[]]
+
+    result = wrapper.check_feature_flag_resource_etags(selects, page_etags)
+
+    assert result is False
+    mock_feature_flag_client.list_feature_flags.assert_not_called()
+
+
+def test_check_feature_flag_resource_etags_missing_page_etags_triggers_refresh():
+    """Missing etag state for a selector should trigger a refresh instead of failing."""
+    mock_client = Mock()
+    mock_feature_flag_client = Mock()
+    wrapper = _ConfigurationClientWrapper("https://fake.endpoint", mock_client, mock_feature_flag_client)
+
+    selects = [SettingSelector(key_filter="app/*"), SettingSelector(key_filter="other/*")]
+    # Only one entry provided for two selectors; the first selector's page hasn't changed.
+    mock_response = Mock()
+    mock_response.by_page.return_value = iter([])
+    mock_feature_flag_client.list_feature_flags.return_value = mock_response
+    page_etags = [["etag1"]]
+
+    result = wrapper.check_feature_flag_resource_etags(selects, page_etags)
+
+    assert result is True

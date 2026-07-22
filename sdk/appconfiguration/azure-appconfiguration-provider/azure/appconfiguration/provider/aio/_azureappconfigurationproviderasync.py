@@ -19,6 +19,7 @@ from typing import (
 )
 from azure.appconfiguration import (  # type:ignore # pylint:disable=no-name-in-module
     ConfigurationSetting,
+    FeatureFlag,
     FeatureFlagConfigurationSetting,
     SecretReferenceConfigurationSetting,
 )
@@ -120,6 +121,7 @@ class AzureAppConfigurationProvider(AzureAppConfigurationProviderBase):  # pylin
         )
         configuration_settings: List[ConfigurationSetting] = []
         feature_flags: Optional[List[FeatureFlagConfigurationSetting]] = None
+        feature_flag_resources: Optional[List[FeatureFlag]] = None
 
         # Timer needs to be reset even if no refresh happened if time had passed
         configuration_refresh_attempted = False
@@ -128,6 +130,7 @@ class AzureAppConfigurationProvider(AzureAppConfigurationProviderBase):  # pylin
         existing_feature_flag_usage = self._tracing_context.feature_filter_usage.copy()
         page_etags: List[List[str]] = []
         feature_flag_page_etags: List[List[str]] = []
+        feature_flag_resource_etags: List[List[str]] = []
         try:
             if self._refresh_enabled and not self._watched_settings and self._refresh_timer.needs_refresh():
                 configuration_refresh_attempted = True
@@ -160,6 +163,16 @@ class AzureAppConfigurationProvider(AzureAppConfigurationProviderBase):  # pylin
                     feature_flags, feature_flag_page_etags = await client.load_feature_flags(
                         self._feature_flag_selectors, headers=headers, **kwargs
                     )
+
+                # Feature flag resources are loaded independently of the key-value based feature flags, using their
+                # own page-level etag state, since they are a separate resource type with a separate
+                # change-detection mechanism.
+                if not self._feature_flag_resource_etags or await client.check_feature_flag_resource_etags(
+                    self._feature_flag_selectors, self._feature_flag_resource_etags, headers=headers, **kwargs
+                ):
+                    feature_flag_resources, feature_flag_resource_etags = await client.load_feature_flag_resources(
+                        self._feature_flag_selectors, headers=headers, **kwargs
+                    )
             # Default to existing settings if no refresh occurred
             processed_settings = self._dict
 
@@ -169,7 +182,9 @@ class AzureAppConfigurationProvider(AzureAppConfigurationProviderBase):  # pylin
                 # Configuration Settings have been refreshed
                 processed_settings = await self._process_configurations(configuration_settings, client)
 
-            processed_settings = self._process_feature_flags(processed_settings, processed_feature_flags, feature_flags)
+            processed_settings = self._process_feature_flags(
+                processed_settings, processed_feature_flags, feature_flags, feature_flag_resources
+            )
             self._dict = processed_settings
             if settings_refreshed:
                 self._page_etags = page_etags
@@ -177,12 +192,14 @@ class AzureAppConfigurationProvider(AzureAppConfigurationProviderBase):  # pylin
                 self._watched_settings.update(updated_watched_settings)
             if feature_flags is not None:
                 self._feature_flag_page_etags = feature_flag_page_etags
+            if feature_flag_resources is not None:
+                self._feature_flag_resource_etags = feature_flag_resource_etags
             # Reset timers at the same time as they should load from the same store.
             if configuration_refresh_attempted:
                 self._refresh_timer.reset()
             if self._feature_flag_refresh_enabled and feature_flag_refresh_attempted:
                 self._feature_flag_refresh_timer.reset()
-            if (settings_refreshed or feature_flags) and self._on_refresh_success:
+            if (settings_refreshed or feature_flags or feature_flag_resources) and self._on_refresh_success:
                 self._on_refresh_success()
         except AzureError as e:
             logger.warning("Failed to refresh configurations from endpoint %s", client.endpoint)
@@ -290,6 +307,7 @@ class AzureAppConfigurationProvider(AzureAppConfigurationProviderBase):  # pylin
                 processed_settings = await self._process_configurations(configuration_settings, client)
 
                 feature_flag_page_etags: List[List[str]] = []
+                feature_flag_resource_etags: List[List[str]] = []
                 if self._feature_flag_enabled:
                     feature_flags: List[FeatureFlagConfigurationSetting]
                     feature_flags, feature_flag_page_etags = await client.load_feature_flags(
@@ -297,7 +315,14 @@ class AzureAppConfigurationProvider(AzureAppConfigurationProviderBase):  # pylin
                         headers=headers,
                         **kwargs,
                     )
-                    processed_settings = self._process_feature_flags(processed_settings, [], feature_flags)
+                    feature_flag_resources, feature_flag_resource_etags = await client.load_feature_flag_resources(
+                        self._feature_flag_selectors,
+                        headers=headers,
+                        **kwargs,
+                    )
+                    processed_settings = self._process_feature_flags(
+                        processed_settings, [], feature_flags, feature_flag_resources
+                    )
                 for (key, label), etag in self._watched_settings.items():
                     if not etag:
                         try:
@@ -324,6 +349,7 @@ class AzureAppConfigurationProvider(AzureAppConfigurationProviderBase):  # pylin
                     self._dict = processed_settings
                     self._page_etags = page_etags
                     self._feature_flag_page_etags = feature_flag_page_etags
+                    self._feature_flag_resource_etags = feature_flag_resource_etags
                 return True
             except AzureError as e:
                 logger.warning("Failed to load configurations from endpoint %s.\n %s", client.endpoint, e.message)
